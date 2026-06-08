@@ -1,0 +1,2617 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Opción 9 — Editor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#1A1A18; --surface:#242420; --card:#2C2C28;
+  --paper:#FBF9F4; --ink:#1C1C1A;
+  --accent:#7AAF6E; --accent-dark:#4A7A3E; --accent-light:#2A3D26;
+  --muted:#9A9890; --border:rgba(255,255,255,0.08);
+  --danger:#C0392B; --gold:#C9A84C;
+  --r:4px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--paper);}
+
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;display:flex;align-items:center;gap:10px;height:52px;flex-shrink:0;}
+.logo{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:400;}
+.logo span{color:var(--accent);}
+.topbar-sep{width:1px;height:24px;background:var(--border);}
+.project-info{flex:1;}
+.project-name{font-size:11px;font-weight:500;letter-spacing:0.5px;}
+.project-meta{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:1px;}
+.topbar-right{display:flex;gap:6px;align-items:center;}
+
+.btn{padding:6px 12px;border-radius:var(--r);font-size:11px;font-weight:500;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+.btn-ghost{background:var(--border);color:var(--paper);}
+.btn-accent{background:var(--accent-dark);color:#fff;}
+.btn-accent:hover{background:var(--accent);}
+.btn-gold{background:rgba(201,168,76,0.15);color:var(--gold);border:1px solid rgba(201,168,76,0.3);}
+.btn-danger{background:rgba(192,57,43,0.15);color:#E74C3C;border:1px solid rgba(192,57,43,0.3);}
+.btn-sm{padding:4px 9px;font-size:10px;}
+.icon-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:var(--r);background:var(--border);border:none;cursor:pointer;font-size:14px;color:var(--paper);}
+.icon-btn.active{background:var(--accent-dark);color:#fff;}
+
+.tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);display:flex;padding:0 14px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;position:fixed;top:52px;left:0;right:0;z-index:49;height:40px;}.tabs-bar::-webkit-scrollbar{display:none;}
+.tab{padding:10px 14px;font-size:11px;font-weight:500;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+.main{position:fixed;top:92px;left:0;right:0;bottom:0;display:flex;overflow:hidden;}
+.plan-area{flex:1;background:#141412;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:12px;position:relative;height:100%;}
+.plan-wrap{background:var(--paper);box-shadow:0 8px 40px rgba(0,0,0,0.5);border-radius:2px;padding:12px;flex-shrink:0;}
+svg{display:block;}
+.zoom-ctrl{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:4px;z-index:10;}
+
+.right-panel{width:0;flex-shrink:0;background:var(--surface);border-left:1px solid var(--border);overflow:hidden;transition:width 0.25s;display:flex;flex-direction:column;height:100%;}
+.right-panel.open{width:280px;}
+.panel-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.panel-title{font-family:'Cormorant Garamond',serif;font-size:16px;}
+.panel-body{flex:1;overflow-y:auto;padding:14px;}
+
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.field input,.field select,.field textarea{width:100%;padding:8px 10px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);font-size:12px;color:var(--paper);font-family:'DM Sans',sans-serif;outline:none;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
+.field textarea{resize:vertical;min-height:70px;font-size:11px;line-height:1.5;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.area-display{background:var(--accent-light);border:1px solid var(--accent-dark);border-radius:var(--r);padding:8px 10px;font-size:14px;font-weight:600;color:var(--accent);text-align:center;margin-bottom:12px;font-family:'Cormorant Garamond',serif;}
+.area-label{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:2px;}
+
+.swatches{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;}
+.swatch{width:22px;height:22px;border-radius:3px;cursor:pointer;border:2px solid transparent;}
+.swatch.sel{border-color:#fff;}
+
+.panel-actions{padding:12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
+
+.specs-view,.notes-view,.check-view,.deco-view{flex:1;overflow-y:auto;padding:16px;height:100%;}
+.specs-title,.notes-title,.check-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;margin-bottom:16px;}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.stat-card{background:var(--card);border-radius:var(--r);padding:12px;border:1px solid var(--border);text-align:center;}
+.stat-val{font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--accent);}
+.stat-lbl{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.specs-table{width:100%;border-collapse:collapse;font-size:11px;}
+.specs-table th{background:var(--card);color:var(--muted);padding:8px 10px;text-align:left;font-weight:500;font-size:9px;letter-spacing:1px;text-transform:uppercase;}
+.specs-table td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.cat-row td{background:var(--accent-light);color:var(--accent);font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:6px 10px;}
+.total-row td{border-top:1px solid var(--accent);color:var(--accent);font-weight:600;padding-top:10px;}
+.dot{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:6px;vertical-align:middle;}
+
+.note-cats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.note-cat-btn{padding:4px 10px;border-radius:20px;font-size:10px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;}
+.note-cat-btn.active{background:var(--accent-dark);color:#fff;border-color:var(--accent-dark);}
+.note-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:8px;display:flex;gap:10px;}
+.note-dot{width:3px;background:var(--accent);border-radius:2px;flex-shrink:0;}
+.note-text{flex:1;font-size:12px;line-height:1.6;}
+.note-meta{font-size:9px;color:var(--muted);margin-top:4px;}
+.note-del{background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;}
+.add-note{display:flex;gap:8px;margin-top:12px;}
+.add-note input{flex:1;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);color:var(--paper);font-size:12px;outline:none;font-family:'DM Sans',sans-serif;}
+
+.progress-bar{height:4px;background:var(--border);border-radius:2px;margin-bottom:6px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s;}
+.check-progress{font-size:10px;color:var(--muted);margin-bottom:16px;}
+.check-section{margin-bottom:16px;}
+.check-section-title{font-size:10px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:8px;border-radius:var(--r);margin-bottom:4px;cursor:pointer;}
+.check-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
+.check-text{font-size:12px;line-height:1.5;}
+.check-text.done{text-decoration:line-through;color:var(--muted);}
+.check-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(70px);background:#2C2C28;color:var(--paper);padding:10px 18px;border-radius:20px;font-size:12px;border:1px solid var(--border);opacity:0;transition:all 0.3s;z-index:999;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px;}
+
+/* ─── Cota input flotante ─── */
+.dim-input-overlay{
+  position:fixed;background:var(--surface);border:1.5px solid var(--accent);
+  border-radius:6px;color:var(--paper);font-size:14px;font-family:'DM Sans',sans-serif;
+  padding:5px 10px;width:84px;text-align:center;z-index:1001;outline:none;
+  box-shadow:0 4px 24px rgba(0,0,0,0.55);
+}
+/* ─── Bottom sheet pill ─── */
+.sheet-pill{
+  display:none;justify-content:center;align-items:center;
+  padding:10px 0 4px;flex-shrink:0;cursor:grab;touch-action:none;user-select:none;
+}
+.sheet-pill-bar{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.22);}
+/* ─── Bottom sheet en móvil ─── */
+@media(max-width:768px){
+  .right-panel{
+    position:fixed!important;
+    width:100%!important;height:0!important;
+    top:auto!important;bottom:0;left:0;right:0;
+    border-left:none!important;border-top:1px solid var(--border);
+    border-radius:16px 16px 0 0;
+    transition:height 0.32s cubic-bezier(0.32,0.72,0,1)!important;
+    z-index:100;
+  }
+  .right-panel.open{width:100%!important;height:65vh!important;}
+  .right-panel.open.bs-expanded{height:91vh!important;}
+  .sheet-pill{display:flex!important;}
+  /* Botón cerrar en bottom sheet — más visible */
+  .panel-header .icon-btn{min-width:36px;}
+}
+
+.wall-editor{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px;}
+.wall-editor svg{width:100%;height:auto;max-width:240px;display:block;margin:0 auto;}
+.wall-seg{cursor:pointer;transition:all 0.15s;}
+.wall-seg:hover{filter:brightness(1.3);}
+.wall-lbl{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;fill:var(--muted);pointer-events:none;}
+.wall-status{font-family:'DM Sans',sans-serif;font-size:9px;fill:var(--accent);pointer-events:none;letter-spacing:0.5px;}
+
+.segment-editor{background:var(--card);border:1px solid var(--accent-dark);border-radius:var(--r);padding:14px;margin-top:10px;}
+.seg-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.seg-title{font-family:'Cormorant Garamond',serif;font-size:15px;color:var(--accent);}
+.seg-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px;}
+.seg-wallview{background:#1A1A18;border-radius:3px;padding:8px;margin-bottom:10px;overflow:hidden;}
+.seg-wallview svg{width:100%;display:block;}
+.seg-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+.seg-item{display:flex;align-items:center;gap:6px;background:var(--bg);padding:8px;border-radius:3px;border:1px solid var(--border);}
+.seg-item select{flex:1;padding:5px 7px;font-size:11px;background:var(--card);border:1px solid var(--border);color:var(--paper);border-radius:3px;font-family:'DM Sans',sans-serif;}
+.seg-item input{width:58px;padding:5px 7px;font-size:11px;background:var(--card);border:1px solid var(--border);color:var(--paper);border-radius:3px;font-family:'DM Sans',sans-serif;text-align:center;}
+.seg-item-unit{font-size:10px;color:var(--muted);}
+.seg-del{background:rgba(192,57,43,0.15);color:#E74C3C;border:none;width:22px;height:22px;border-radius:3px;cursor:pointer;font-size:12px;}
+.seg-add-btn{width:100%;padding:7px;background:rgba(122,175,110,0.15);border:1px dashed var(--accent-dark);color:var(--accent);border-radius:3px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;}
+.seg-total{font-size:10px;color:var(--muted);text-align:center;margin-top:6px;}
+.seg-total.ok{color:var(--accent);}
+.seg-total.warn{color:#E74C3C;}
+.seg-detail-btn{width:100%;padding:6px 10px;margin-top:8px;background:rgba(201,168,76,0.15);color:var(--gold);border:1px solid rgba(201,168,76,0.3);border-radius:3px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:0.3px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Op<span>9</span></div>
+  <div class="topbar-sep"></div>
+  <div class="project-info">
+    <div class="project-name">Opción 9 — Residencia</div>
+    <div class="project-meta">Terreno 32×34 m · 337 m² · 3 Alcobas</div>
+  </div>
+  <div class="topbar-right">
+    <button class="icon-btn" id="gridBtn" onclick="toggleGrid()" title="Cuadrícula">⊞</button>
+    <button class="icon-btn" id="labelBtn" onclick="toggleLabels()" title="Etiquetas">T</button>
+    <button class="btn btn-ghost btn-sm" onclick="window.print()">↗ PDF</button>
+    <button class="btn btn-accent btn-sm" onclick="addRoom()">+ Espacio</button>
+  </div>
+</div>
+
+<div class="tabs-bar">
+  <div class="tab active" onclick="switchTab('plan')">📐 Plano</div>
+  <div class="tab" onclick="switchTab('specs')">📋 Especificaciones</div>
+  <div class="tab" onclick="switchTab('notes')">📝 Notas</div>
+  <div class="tab" onclick="switchTab('3d')">🏠 Vista 3D</div>
+  <div class="tab" onclick="switchTab('deco')">🎨 Decoración</div>
+  <div class="tab" onclick="switchTab('check')">✅ Checklist</div>
+</div>
+
+<div class="main">
+
+  <div class="plan-area" id="planView">
+    <div class="plan-wrap"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div class="zoom-ctrl">
+      <button class="icon-btn" onclick="zoom(1.2)">+</button>
+      <button class="icon-btn" onclick="zoom(0.83)">−</button>
+      <button class="icon-btn" onclick="resetZoom()">⊙</button>
+    </div>
+  </div>
+
+  <div class="right-panel" id="rightPanel">
+    <div class="sheet-pill" id="sheetPill"><div class="sheet-pill-bar"></div></div>
+    <div class="panel-header">
+      <div class="panel-title" id="panelTitle">Editar</div>
+      <button class="icon-btn" onclick="closePanel()">×</button>
+    </div>
+    <div class="panel-body">
+      <div class="area-display">
+        <span class="area-label">Área calculada</span>
+        <span id="areaDisplay">— m²</span>
+      </div>
+      <div class="field"><label>Nombre</label><input id="fName" type="text"></div>
+      <div class="field"><label>Subtítulo</label><input id="fSub" type="text" placeholder="ej. 6×5m"></div>
+      <div class="field">
+        <label>Categoría</label>
+        <select id="fCat">
+          <option>Alcobas</option><option>Baños</option><option>Vestieres</option>
+          <option>Estudios</option><option>Social</option><option>Circulación</option>
+          <option>Servicio</option><option>Garaje</option><option>Exterior</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="field"><label>Columnas</label><div class="field-row"><input id="fC1" type="number" step="0.5"><input id="fC2" type="number" step="0.5"></div></div>
+      <div class="field"><label>Filas</label><div class="field-row"><input id="fF1" type="number" step="0.5"><input id="fF2" type="number" step="0.5"></div></div>
+      <div class="field">
+        <label>Paredes del espacio</label>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.4;">Toca una pared para cambiar su tipo, o usa <strong style="color:var(--gold);">Editar por secciones</strong> para dividir una pared.</div>
+        <div class="wall-editor" id="wallEditor">
+          <!-- SVG generated by JS -->
+        </div>
+        <button class="seg-detail-btn" onclick="openSegmentEditor()">✂ Editar por secciones</button>
+        <div id="segmentEditor" style="display:none;"></div>
+        <div id="wallLegend" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:9px;">
+          <div style="display:flex;align-items:center;gap:4px;"><div style="width:14px;height:3px;background:#1C1C1A;"></div><span style="color:var(--muted);">Muro</span></div>
+          <div style="display:flex;align-items:center;gap:4px;"><div style="width:14px;height:3px;background:#5A8FC0;"></div><span style="color:var(--muted);">Ventanal</span></div>
+          <div style="display:flex;align-items:center;gap:4px;"><div style="width:14px;height:3px;background:#8B6F47;"></div><span style="color:var(--muted);">Puerta</span></div>
+          <div style="display:flex;align-items:center;gap:4px;"><div style="width:14px;height:3px;background:transparent;border-top:1.5px dashed #7AAF6E;"></div><span style="color:var(--muted);">Abierta</span></div>
+        </div>
+      </div>
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="fOpenArea" style="width:auto;"> Área abierta <span style="color:var(--muted);font-size:10px;">(sin ninguna pared)</span></label>
+      </div>
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="fColumns" style="width:auto;"> Espacio techado con columnas <span style="color:var(--muted);font-size:10px;">(ej. garaje)</span></label>
+      </div>
+      <div class="field" id="lshapeFields" style="display:none">
+        <label>Muesca en L</label>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:10px;">
+          <div class="field-row" style="margin-bottom:6px;">
+            <div><label style="font-size:8px">C1</label><input id="fNC1" type="number" step="0.5"></div>
+            <div><label style="font-size:8px">C2</label><input id="fNC2" type="number" step="0.5"></div>
+          </div>
+          <div class="field-row">
+            <div><label style="font-size:8px">F1</label><input id="fNF1" type="number" step="0.5"></div>
+            <div><label style="font-size:8px">F2</label><input id="fNF2" type="number" step="0.5"></div>
+          </div>
+        </div>
+      </div>
+      <div class="field"><label>Color</label><div class="swatches" id="swatches"></div></div>
+      <div class="field">
+        <label>Material / Acabado</label>
+        <select id="fMaterial">
+          <option value="">— Sin definir —</option>
+          <option>Piso madera ingeniería</option>
+          <option>Piso porcelanato 60×60</option>
+          <option>Piso mármol</option>
+          <option>Piso concreto pulido</option>
+          <option>Piso vinilo SPC</option>
+          <option>Piso cerámica</option>
+          <option>Piso deck madera</option>
+          <option>Piso epóxico</option>
+        </select>
+      </div>
+      <div class="field"><label>Altura libre (m)</label><input id="fHeight" type="number" step="0.1" placeholder="2.60"></div>
+      <div class="field"><label>Notas</label><textarea id="fNotes"></textarea></div>
+    </div>
+    <div class="panel-actions">
+      <button class="btn btn-accent" onclick="applyEdit()">✓ Aplicar</button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-gold btn-sm" onclick="duplicateRoom()" style="flex:1">⊕ Duplicar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteRoom()" style="flex:1">🗑 Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="specs-view" id="specsView" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div class="specs-title" style="margin:0">Especificaciones</div>
+      <button class="btn btn-ghost btn-sm" onclick="window.print()">↗ Exportar</button>
+    </div>
+    <div class="stat-grid" id="statGrid"></div>
+    <table class="specs-table" id="specsTable"></table>
+  </div>
+
+  <div class="notes-view" id="notesView" style="display:none;">
+    <div class="notes-title">Notas para el Arquitecto</div>
+    <div class="note-cats">
+      <button class="note-cat-btn active" onclick="setNoteCat(this,'Todas')">Todas</button>
+      <button class="note-cat-btn" onclick="setNoteCat(this,'Estructura')">Estructura</button>
+      <button class="note-cat-btn" onclick="setNoteCat(this,'Acabados')">Acabados</button>
+      <button class="note-cat-btn" onclick="setNoteCat(this,'Instalaciones')">Instalaciones</button>
+      <button class="note-cat-btn" onclick="setNoteCat(this,'Paisajismo')">Paisajismo</button>
+      <button class="note-cat-btn" onclick="setNoteCat(this,'General')">General</button>
+    </div>
+    <div id="notesList"></div>
+    <div class="add-note">
+      <input id="noteInput" type="text" placeholder="Agregar nota...">
+      <button class="btn btn-accent" onclick="addNote()">+ Agregar</button>
+    </div>
+  </div>
+
+  <div class="check-view" id="checkView" style="display:none;">
+    <div class="check-title">Checklist — Reunión con Arquitecto</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="check-progress" id="checkProgress">0 de 0 completados</div>
+    <div id="checkLists"></div>
+  </div>
+</div>
+
+<div class="view-3d" id="view3d" style="display:none;flex:1;background:linear-gradient(180deg,#1A2620 0%,#0F1815 100%);overflow:hidden;position:relative;height:100%;">
+    <div id="threejs-container" style="width:100%;height:100%;"></div>
+    <div style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);padding:10px 14px;border-radius:6px;font-size:11px;color:#fff;border:1px solid rgba(122,175,110,0.3);max-width:240px;">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:16px;color:#7AAF6E;margin-bottom:6px;">Vista 3D</div>
+      <div style="font-size:10px;color:#aaa;line-height:1.5;">
+        🖱️ Arrastra para rotar<br>
+        📱 Dos dedos: zoom<br>
+        ⚡ Toca un cuarto para info
+      </div>
+    </div>
+    <div style="position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:4px;">
+      <button class="icon-btn" onclick="view3d.resetCamera()" title="Reset vista">⊙</button>
+      <button class="icon-btn" onclick="view3d.toggleRoof()" id="roofBtn" title="Techo">▲</button>
+      <button class="icon-btn" onclick="view3d.toggleLabels3d()" id="labels3dBtn" title="Etiquetas">T</button>
+    </div>
+    <div id="info3d" style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);padding:10px 18px;border-radius:20px;color:#fff;font-size:12px;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;border:1px solid rgba(122,175,110,0.4);"></div>
+  </div>
+
+<div class="deco-view" id="decoView" style="display:none;overflow-y:auto;padding:16px;">
+    <div class="deco-title" style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;margin-bottom:6px;">Decoración & Diseño Interior</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:16px;letter-spacing:0.3px;">Propuestas por espacio — estilo moderno contemporáneo con acentos naturales</div>
+    <div id="decoList"></div>
+  </div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let rooms = [
+  {id:1, name:'ALCOBA PRINCIPAL', sub:'8.5×4.5m', c1:6, f1:8, c2:14.5, f2:12.5, fill:'#FDECEA', cat:'Alcobas', notes:'', material:'', height:2.6, ventanales:['N','W']},
+  {id:2, name:'BAÑO', sub:'ppal.', c1:10, f1:8, c2:14.5, f2:9.5, fill:'#E3F0F7', cat:'Baños', notes:'', material:'', height:2.4},
+  {id:3, name:'VEST.1', sub:'', c1:12.5, f1:9.5, c2:14.5, f2:11, fill:'#F5EFE4', cat:'Vestieres', notes:'', material:'', height:2.4},
+  {id:4, name:'VEST.2', sub:'', c1:11, f1:11, c2:14.5, f2:13, fill:'#F5EFE4', cat:'Vestieres', notes:'', material:'', height:2.4},
+  {id:5, name:'ESTUDIO MÚSICA', sub:'', c1:6, f1:12.5, c2:10, f2:15, fill:'#EEF4E8', cat:'Estudios', notes:'Insonorización', material:'', height:2.6},
+  {id:6, name:'ESTUDIO TV', sub:'', c1:10, f1:11.5, c2:16, f2:17, fill:'#EEF4E8', cat:'Estudios', notes:'', material:'', height:2.6, lshape:true, notchC1:11, notchF1:13, notchC2:14.5, notchF2:13},
+  {id:7, name:'ALCOBA 1', sub:'8×4m', c1:16, f1:10, c2:24, f2:14, fill:'#FDECEA', cat:'Alcobas', notes:'', material:'', height:2.6, ventanales:['N','E']},
+  {id:8, name:'BAÑO', sub:'alc.1', c1:16, f1:10, c2:18, f2:12.5, fill:'#E3F0F7', cat:'Baños', notes:'', material:'', height:2.4},
+  {id:9, name:'VESTIER', sub:'alc.1', c1:18, f1:10, c2:19.5, f2:12.5, fill:'#F5EFE4', cat:'Vestieres', notes:'', material:'', height:2.4},
+  {id:10, name:'ALCOBA 2', sub:'8×4m', c1:16, f1:14, c2:24, f2:18, fill:'#FDECEA', cat:'Alcobas', notes:'', material:'', height:2.6, ventanales:['E']},
+  {id:11, name:'BAÑO', sub:'alc.2', c1:16, f1:15.5, c2:18, f2:18, fill:'#E3F0F7', cat:'Baños', notes:'', material:'', height:2.4},
+  {id:12, name:'VESTIER', sub:'alc.2', c1:18, f1:15.5, c2:19.5, f2:18, fill:'#F5EFE4', cat:'Vestieres', notes:'', material:'', height:2.4},
+  {id:13, name:'TERRAZA', sub:'4×8m', c1:6, f1:17, c2:10, f2:25, fill:'#EDF5EB', cat:'Social', notes:'Mirador abierto', material:'Deck madera', height:0, openArea:true},
+  {id:14, name:'SALÓN', sub:'6×5m', c1:10, f1:17, c2:16, f2:22, fill:'#FDFAF3', cat:'Social', notes:'', material:'', height:2.6, openArea:true, ventanales:['W']},
+  {id:15, name:'COMEDOR', sub:'6×3m', c1:10, f1:22, c2:16, f2:25, fill:'#FDFAF3', cat:'Social', notes:'', material:'', height:2.6, openArea:true, ventanales:['W']},
+  {id:16, name:'BAÑO SOCIAL', sub:'', c1:16, f1:20.5, c2:18, f2:22, fill:'#E3F0F7', cat:'Baños', notes:'', material:'', height:2.4},
+  {id:17, name:'HALL', sub:'entrada', c1:16, f1:22, c2:19, f2:23.5, fill:'#F2F0EB', cat:'Circulación', notes:'', material:'', height:2.6},
+  {id:18, name:'ESCALERA', sub:'→ mir.', c1:7.5, f1:25, c2:10, f2:26.5, fill:'#F2F0EB', cat:'Circulación', notes:'Acceso mirador', material:'', height:0},
+  {id:19, name:'COCINA', sub:'6×2.5m', c1:10, f1:25, c2:16, f2:27.5, fill:'#FDF5E8', cat:'Social', notes:'Cocina abierta', material:'', height:2.6, openArea:true, ventanales:['W']},
+  {id:20, name:'ROPERÍA', sub:'', c1:10, f1:27.5, c2:11.5, f2:29, fill:'#EEF5EE', cat:'Servicio', notes:'', material:'', height:2.4},
+  {id:21, name:'PATIO SERV.', sub:'', c1:11.5, f1:27.5, c2:13, f2:29, fill:'#EDF5EB', cat:'Servicio', notes:'', material:'', height:0},
+  {id:22, name:'CUARTO SERV.', sub:'', c1:13, f1:27.5, c2:15, f2:29, fill:'#EEF5EE', cat:'Servicio', notes:'', material:'', height:2.4},
+  {id:23, name:'BAÑO SERV.', sub:'', c1:15, f1:27.5, c2:16.5, f2:29, fill:'#E3F0F7', cat:'Servicio', notes:'', material:'', height:2.4},
+  {id:24, name:'GARAJE', sub:'6.5×5.5m', c1:16, f1:23.5, c2:22.5, f2:29, fill:'#E8EFE8', cat:'Garaje', notes:'2 autos. Techado con columnas — paredes exteriores abiertas', material:'Piso epóxico', height:2.4, noWalls:['S','E'], columns:true},
+  {id:25, name:'PARQUEADERO', sub:'visitantes', c1:14, f1:29, c2:22, f2:33, fill:'#E8E6E0', cat:'Exterior', notes:'', material:'', height:0, openArea:true},
+  {id:26, name:'PUERTA PPAL.', sub:'', c1:22, f1:29, c2:24, f2:33, fill:'#F2F0EB', cat:'Exterior', notes:'', material:'', height:0, openArea:true},
+];
+
+const mirador = {c1:6, f1:17, c2:9.5, f2:20};
+
+const COLORS = ['#FDECEA','#E3F0F7','#F5EFE4','#EEF4E8','#FDFAF3','#FDF5E8','#EDF5EB','#E8EFE8','#F2F0EB','#EEF5EE','#E8E6E0','#E8E4F0','#F0E8E8','#E4EDF0','#F5F2EC'];
+
+let notes = [
+  {id:1, text:'Confirmar orientación solar — fachada norte para alcobas', cat:'General', ts:'Hoy'},
+  {id:2, text:'Revisar ventilación cruzada en salón y comedor', cat:'Instalaciones', ts:'Hoy'},
+  {id:3, text:'Definir altura libre mínima 2.60m en zonas sociales', cat:'Estructura', ts:'Hoy'},
+];
+
+const checklist = [
+  {cat:'Distribución', items:[
+    {id:'c1', text:'Confirmar distribución general de alcobas', sub:'Revisar accesos y privacidad'},
+    {id:'c2', text:'Validar circulación entre zonas día/noche'},
+    {id:'c3', text:'Definir ubicación exacta de escalera al mirador'},
+    {id:'c4', text:'Revisar dimensiones de garaje'},
+  ]},
+  {cat:'Fachadas y ventanales', items:[
+    {id:'c5', text:'Definir tipo de ventanal — fijo o corredizo'},
+    {id:'c6', text:'Revisar privacidad en fachada este'},
+    {id:'c7', text:'Diseñar protección solar'},
+  ]},
+  {cat:'Acabados y materiales', items:[
+    {id:'c8', text:'Definir piso zona social'},
+    {id:'c9', text:'Seleccionar enchape baños'},
+    {id:'c10', text:'Confirmar deck terraza'},
+    {id:'c11', text:'Definir cielos rasos'},
+  ]},
+  {cat:'Instalaciones', items:[
+    {id:'c12', text:'Ubicar cuarto de bombas'},
+    {id:'c13', text:'Sistema de aire acondicionado'},
+    {id:'c14', text:'Punto de gas'},
+    {id:'c15', text:'Instalación eléctrica'},
+  ]},
+  {cat:'Exterior y paisajismo', items:[
+    {id:'c16', text:'Diseño de zonas verdes'},
+    {id:'c17', text:'Cerramiento del terreno'},
+    {id:'c18', text:'Iluminación exterior'},
+  ]},
+];
+
+let checked = {};
+let selectedId = null;
+let showGrid = true;
+let showLabels = true;
+let zoomLevel = 1;
+let currentTab = 'plan';
+let currentNoteCat = 'Todas';
+let nextId = 40;
+let view3dDirty = false;
+let dragHandle = null;   // estado del drag de handles
+let didDrag = false;     // previene click-select tras un drag
+
+const svg = document.getElementById('svg');
+const ns = t => document.createElementNS('http://www.w3.org/2000/svg', t);
+const COLS = 32, FILAS = 34;
+let U = 14;
+
+function SX(c){ return 28 + c*U; }
+function SY(f){ return 22 + f*U; }
+function SW(c1,c2){ return (c2-c1)*U; }
+function SH(f1,f2){ return (f2-f1)*U; }
+function area(r){
+  if(r.lshape){
+    const full = (r.c2-r.c1)*(r.f2-r.f1);
+    const notch = (r.notchC2-r.notchC1)*(r.notchF2-r.notchF1);
+    return (full - notch).toFixed(1);
+  }
+  return ((r.c2-r.c1)*(r.f2-r.f1)).toFixed(1);
+}
+
+function draw(){
+  const panelOpen = document.getElementById('rightPanel').classList.contains('open');
+  const avail = Math.min(window.innerWidth - (panelOpen ? 280 : 0) - 44, 640);
+  U = Math.max(8, (avail - 40) / COLS) * zoomLevel;
+
+  const ML = 28, MT = 22, MR = 10, MB = 20;
+  const VW = ML + COLS*U + MR;
+  const VH = MT + FILAS*U + MB;
+
+  svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
+  svg.setAttribute('width', VW);
+  svg.setAttribute('height', VH);
+  svg.innerHTML = '';
+
+  addR(SX(0), SY(0), COLS*U, FILAS*U, '#E8F0DE', '#4A7A3E', 1.8);
+  addT(SX(COLS)-4, SY(0)+8, 'TERRENO 32×34 m', Math.max(6, U*0.4), '600', '#3A6035', 'end');
+
+  rooms.forEach(r => { if(r.lshape) drawLShape(r); else drawRoom(r); });
+
+  addR(SX(mirador.c1)+1, SY(mirador.f1)+1, SW(mirador.c1,mirador.c2)-2, SH(mirador.f1,mirador.f2)-2, 'none', '#3D5A38', 0.7, '3,2');
+  const mfs = Math.max(U*0.25, U*0.32);
+  addT(SX(mirador.c1)+SW(mirador.c1,mirador.c2)/2, SY(mirador.f1)+SH(mirador.f1,mirador.f2)*0.4, 'MIRADOR', mfs, '600', '#3D5A38');
+  addT(SX(mirador.c1)+SW(mirador.c1,mirador.c2)/2, SY(mirador.f1)+SH(mirador.f1,mirador.f2)*0.65, '↑ abierto', mfs*0.75, '300', '#5A8A52');
+
+  if(showGrid){
+    for(let c = 0; c <= COLS; c += 0.5){
+      if(Number.isInteger(c)) continue;
+      addL(SX(c), SY(0), SX(c), SY(FILAS), 'rgba(30,60,30,0.15)', 0.2);
+    }
+    for(let f = 0; f <= FILAS; f += 0.5){
+      if(Number.isInteger(f)) continue;
+      addL(SX(0), SY(f), SX(COLS), SY(f), 'rgba(30,60,30,0.15)', 0.2);
+    }
+    for(let c = 0; c <= COLS; c++){
+      const big = c % 5 === 0;
+      addL(SX(c), SY(0), SX(c), SY(FILAS), big ? 'rgba(30,60,30,0.45)' : 'rgba(30,60,30,0.25)', big ? 0.4 : 0.25);
+    }
+    for(let f = 0; f <= FILAS; f++){
+      const big = f % 5 === 0;
+      addL(SX(0), SY(f), SX(COLS), SY(f), big ? 'rgba(30,60,30,0.45)' : 'rgba(30,60,30,0.25)', big ? 0.4 : 0.25);
+    }
+  }
+
+  const fs = Math.max(6, Math.min(8, U*0.48));
+  for(let c = 0; c <= COLS; c++) addT(SX(c), MT*0.55, c, fs, c%5===0?'700':'500', c%5===0?'#1C1C1A':'#3A6035');
+  for(let f = 0; f <= FILAS; f++) addT(ML*0.5, SY(f), f, fs, f%5===0?'700':'500', f%5===0?'#1C1C1A':'#3A6035');
+  addT(ML*0.5, MT*0.55, 'F\\C', fs*0.8, '600', '#1C1C1A');
+
+  const limColor = '#C0392B', limW = 1.4;
+  addL(SX(0), SY(8), SX(24), SY(8), limColor, limW);
+  addL(SX(0), SY(29), SX(24), SY(29), limColor, limW);
+  addL(SX(24), SY(8), SX(24), SY(29), limColor, limW);
+  addL(SX(5), SY(8), SX(5), SY(29), limColor, limW);
+
+  addT(SX(COLS/2), MT + FILAS*U + MB*0.6, '32 m', fs, '400', '#3A6035');
+
+  // Cotas profesionales + handles de redimensión en cuarto seleccionado
+  if(selectedId){
+    const sr = rooms.find(x => x.id === selectedId);
+    if(sr && !sr.lshape){ drawCotas(sr); drawHandles(sr); }
+  }
+}
+
+function drawRoom(r){
+  const x = SX(r.c1), y = SY(r.f1);
+  const w = SW(r.c1, r.c2), h = SH(r.f1, r.f2);
+  const sel = selectedId === r.id;
+  if(sel){
+    const sh = ns('rect');
+    sh.setAttribute('x', x-3); sh.setAttribute('y', y-3);
+    sh.setAttribute('width', w+6); sh.setAttribute('height', h+6);
+    sh.setAttribute('fill', 'rgba(122,175,110,0.25)');
+    svg.appendChild(sh);
+  }
+  const rect = ns('rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('fill', r.fill);
+  rect.setAttribute('stroke', sel ? '#3D5A38' : '#1C1C1A');
+  rect.setAttribute('stroke-width', sel ? 2 : 0.9);
+  // Dashed stroke for open areas
+  if(r.openArea) rect.setAttribute('stroke-dasharray', '3,2');
+  rect.setAttribute('cursor', 'pointer');
+  rect.addEventListener('click', () => { if(!didDrag) selectRoom(r.id); });
+  svg.appendChild(rect);
+
+  // Draw ventanales (blue thick lines)
+  if(r.ventanales){
+    const t = Math.max(1.8, U*0.1);
+    r.ventanales.forEach(edge => {
+      const vr = ns('rect');
+      const m = {
+        N: [x, y, w, t],
+        S: [x, y+h-t, w, t],
+        W: [x, y, t, h],
+        E: [x+w-t, y, t, h]
+      }[edge];
+      vr.setAttribute('x', m[0]); vr.setAttribute('y', m[1]);
+      vr.setAttribute('width', m[2]); vr.setAttribute('height', m[3]);
+      vr.setAttribute('fill', 'rgba(70,140,200,0.9)');
+      svg.appendChild(vr);
+    });
+  }
+  // Draw doors (arc showing swing)
+  if(r.doors){
+    const doorW = Math.min(U*0.9, w*0.3, h*0.3);
+    r.doors.forEach(edge => {
+      let px, py, arcFrom, arcTo;
+      if(edge === 'N'){ px = x + w/2; py = y; arcFrom = [px, py]; arcTo = [px + doorW, py + doorW]; }
+      else if(edge === 'S'){ px = x + w/2; py = y + h; arcFrom = [px, py]; arcTo = [px - doorW, py - doorW]; }
+      else if(edge === 'W'){ px = x; py = y + h/2; arcFrom = [px, py]; arcTo = [px + doorW, py + doorW]; }
+      else { px = x + w; py = y + h/2; arcFrom = [px, py]; arcTo = [px - doorW, py + doorW]; }
+      // White gap on wall
+      const gap = ns('rect');
+      if(edge === 'N' || edge === 'S'){
+        gap.setAttribute('x', px - doorW/2); gap.setAttribute('y', py - 1);
+        gap.setAttribute('width', doorW); gap.setAttribute('height', 2);
+      } else {
+        gap.setAttribute('x', px - 1); gap.setAttribute('y', py - doorW/2);
+        gap.setAttribute('width', 2); gap.setAttribute('height', doorW);
+      }
+      gap.setAttribute('fill', r.fill);
+      svg.appendChild(gap);
+      // Arc
+      const arc = ns('path');
+      arc.setAttribute('d', `M ${arcFrom[0]} ${arcFrom[1]} A ${doorW} ${doorW} 0 0 1 ${arcTo[0]} ${arcTo[1]}`);
+      arc.setAttribute('fill', 'none');
+      arc.setAttribute('stroke', '#8B6F47');
+      arc.setAttribute('stroke-width', 0.6);
+      svg.appendChild(arc);
+      // Door leaf (line)
+      const leaf = ns('line');
+      leaf.setAttribute('x1', arcFrom[0]); leaf.setAttribute('y1', arcFrom[1]);
+      leaf.setAttribute('x2', arcTo[0]); leaf.setAttribute('y2', arcTo[1]);
+      leaf.setAttribute('stroke', '#5A4A2E');
+      leaf.setAttribute('stroke-width', 1.2);
+      svg.appendChild(leaf);
+    });
+  }
+
+  if(showLabels) roomLabel(r, x, y, w, h);
+}
+
+function drawLShape(r){
+  const sel = selectedId === r.id;
+  const pts = [
+    [SX(r.c1),      SY(r.f1)],
+    [SX(r.notchC1), SY(r.f1)],
+    [SX(r.notchC1), SY(r.notchF2)],
+    [SX(r.notchC2), SY(r.notchF2)],
+    [SX(r.notchC2), SY(r.notchF1)],
+    [SX(r.c2),      SY(r.notchF1)],
+    [SX(r.c2),      SY(r.f2)],
+    [SX(r.c1),      SY(r.f2)],
+  ].map(p => p.join(',')).join(' ');
+  const poly = ns('polygon');
+  poly.setAttribute('points', pts);
+  poly.setAttribute('fill', r.fill);
+  poly.setAttribute('stroke', sel ? '#3D5A38' : '#1C1C1A');
+  poly.setAttribute('stroke-width', sel ? 2 : 0.9);
+  poly.setAttribute('cursor', 'pointer');
+  poly.addEventListener('click', () => { if(!didDrag) selectRoom(r.id); });
+  svg.appendChild(poly);
+  if(showLabels){
+    const cx = SX(r.c1) + SW(r.c1, r.c2)/2;
+    const cy = SY(r.notchF2) + SH(r.notchF2, r.f2)/2;
+    const fs0 = Math.max(U*0.25, Math.min(U*0.4, SW(r.c1, r.c2)*0.1));
+    addT(cx, cy - fs0*0.7, r.name, fs0, '600', '#1C1C1A');
+    addT(cx, cy + fs0*0.5, `${area(r)} m²`, fs0*0.72, '300', '#666');
+  }
+}
+
+function roomLabel(r, x, y, w, h){
+  const cx = x + w/2, cy = y + h/2;
+  const fs0 = Math.max(U*0.18, Math.min(U*0.42, w*0.13));
+  const fs1 = fs0 * 0.75;
+  const lh = fs0 * 1.5;
+  const charW = fs0 * 0.6;
+  const maxChars = Math.floor(w / charW);
+
+  function wrapName(name){
+    if(name.length <= maxChars) return [name];
+    const mid = Math.floor(name.length / 2);
+    const sp = name.lastIndexOf(' ', mid) > 0 ? name.lastIndexOf(' ', mid) : name.indexOf(' ', mid);
+    if(sp > 0) return [name.slice(0, sp), name.slice(sp+1)];
+    return [name];
+  }
+
+  const minD = Math.min(w, h);
+  const nameLines = minD > U*0.9 ? wrapName(r.name) : [];
+  const showSub = r.sub && h > U*2 && w > U*1.5;
+  const showArea = +area(r) > 5 && h > U*2.8 && w > U*2;
+
+  if(nameLines.length === 0){
+    const abbr = r.name.split(' ').map(w => w[0]).join('').slice(0,3);
+    addT(cx, cy, abbr, Math.max(U*0.22, fs0*0.8), '700', '#1C1C1A');
+    return;
+  }
+  const totalLines = nameLines.length + (showSub?1:0) + (showArea?1:0);
+  let curY = cy - ((totalLines - 1) * lh) / 2;
+  nameLines.forEach(line => { addT(cx, curY, line, fs0, '600', '#1C1C1A'); curY += lh; });
+  if(showSub){ addT(cx, curY, r.sub, fs1, '300', '#666'); curY += lh; }
+  if(showArea){ addT(cx, curY, `${area(r)} m²`, fs1*0.85, '400', '#999'); }
+}
+
+function addR(x,y,w,h,fill,stroke,sw,dash){
+  const r = ns('rect');
+  r.setAttribute('x',x); r.setAttribute('y',y); r.setAttribute('width',w); r.setAttribute('height',h);
+  r.setAttribute('fill',fill||'none'); r.setAttribute('stroke',stroke||'none'); r.setAttribute('stroke-width',sw||0);
+  if(dash) r.setAttribute('stroke-dasharray',dash);
+  svg.appendChild(r);
+}
+function addL(x1,y1,x2,y2,stroke,sw){
+  const l = ns('line');
+  l.setAttribute('x1',x1); l.setAttribute('y1',y1); l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+  l.setAttribute('stroke',stroke); l.setAttribute('stroke-width',sw||0.3);
+  svg.appendChild(l);
+}
+function addT(x,y,t,size,weight,fill,anchor){
+  if(t === undefined || t === null) return;
+  const el = ns('text');
+  el.setAttribute('x',x); el.setAttribute('y',y);
+  el.setAttribute('font-size',size); el.setAttribute('font-weight',weight||'400');
+  el.setAttribute('fill',fill||'#1C1C1A'); el.setAttribute('text-anchor',anchor||'middle');
+  el.setAttribute('dominant-baseline','central'); el.setAttribute('font-family','DM Sans,sans-serif');
+  el.textContent = t;
+  svg.appendChild(el);
+}
+
+function selectRoom(id){
+  selectedId = id;
+  const r = rooms.find(x => x.id === id);
+  if(!r) return;
+  document.getElementById('fName').value = r.name;
+  document.getElementById('fSub').value = r.sub || '';
+  document.getElementById('fCat').value = r.cat || 'Otro';
+  document.getElementById('fC1').value = r.c1;
+  document.getElementById('fC2').value = r.c2;
+  document.getElementById('fF1').value = r.f1;
+  document.getElementById('fF2').value = r.f2;
+  document.getElementById('fNotes').value = r.notes || '';
+  document.getElementById('fMaterial').value = r.material || '';
+  document.getElementById('fHeight').value = r.height || '';
+  document.getElementById('panelTitle').textContent = r.name;
+  buildSwatches(r.fill);
+  updateAreaDisplay();
+  buildWallEditor(r);
+  document.getElementById('fOpenArea').checked = !!r.openArea;
+  document.getElementById('fColumns').checked = !!r.columns;
+  const lf = document.getElementById('lshapeFields');
+  if(r.lshape){
+    lf.style.display = 'block';
+    document.getElementById('fNC1').value = r.notchC1;
+    document.getElementById('fNC2').value = r.notchC2;
+    document.getElementById('fNF1').value = r.notchF1;
+    document.getElementById('fNF2').value = r.notchF2;
+  } else {
+    lf.style.display = 'none';
+  }
+  document.getElementById('rightPanel').classList.add('open');
+  draw();
+}
+
+function updateAreaDisplay(){
+  const c1 = +document.getElementById('fC1').value;
+  const c2 = +document.getElementById('fC2').value;
+  const f1 = +document.getElementById('fF1').value;
+  const f2 = +document.getElementById('fF2').value;
+  if(c2 > c1 && f2 > f1) document.getElementById('areaDisplay').textContent = `${((c2-c1)*(f2-f1)).toFixed(2)} m²`;
+}
+['fC1','fC2','fF1','fF2'].forEach(id => document.getElementById(id).addEventListener('input', updateAreaDisplay));
+
+function buildWallEditor(r){
+  const container = document.getElementById('wallEditor');
+  if(!container) return;
+
+  // States cycle: wall → ventanal → door → open → wall
+  const vents = r.ventanales || [];
+  const doors = r.doors || [];
+  const noWalls = r.noWalls || [];
+
+  function getState(edge){
+    if(noWalls.includes(edge)) return 'open';
+    if(doors.includes(edge)) return 'door';
+    if(vents.includes(edge)) return 'vent';
+    return 'wall';
+  }
+
+  function setState(edge, state){
+    // Remove from all
+    r.ventanales = (r.ventanales || []).filter(e => e !== edge);
+    r.doors = (r.doors || []).filter(e => e !== edge);
+    r.noWalls = (r.noWalls || []).filter(e => e !== edge);
+    // Set new
+    if(state === 'vent') r.ventanales.push(edge);
+    else if(state === 'door') r.doors.push(edge);
+    else if(state === 'open') r.noWalls.push(edge);
+    // Clean empty arrays
+    if(!r.ventanales.length) delete r.ventanales;
+    if(!r.doors.length) delete r.doors;
+    if(!r.noWalls.length) delete r.noWalls;
+  }
+
+  function cycleState(edge){
+    const states = ['wall', 'vent', 'door', 'open'];
+    const cur = getState(edge);
+    const next = states[(states.indexOf(cur) + 1) % states.length];
+    setState(edge, next);
+    // If segments exist for this edge, clear them so simple state takes precedence
+    if(r.segments && r.segments[edge]){
+      delete r.segments[edge];
+      if(Object.keys(r.segments).length === 0) delete r.segments;
+    }
+    buildWallEditor(r);
+    view3dDirty = true;
+    draw();
+  }
+
+  const colors = {
+    wall: {stroke: '#E8E6E0', width: 8, dash: null, label: 'MURO'},
+    vent: {stroke: '#5A8FC0', width: 8, dash: null, label: 'VENTANAL'},
+    door: {stroke: '#8B6F47', width: 8, dash: null, label: 'PUERTA'},
+    open: {stroke: '#7AAF6E', width: 2, dash: '4,3', label: 'ABIERTA'}
+  };
+
+  // SVG: 200x200 with room in center, walls clickable
+  const VW = 220, VH = 200;
+  const pad = 28;
+  const x1 = pad, x2 = VW - pad;
+  const y1 = pad, y2 = VH - pad;
+
+  function wallSvg(edge){
+    const c = colors[getState(edge)];
+    let line;
+    if(edge === 'N') line = {x1, y1, x2, y2: y1};
+    else if(edge === 'S') line = {x1, y1: y2, x2, y2};
+    else if(edge === 'W') line = {x1, y1, x2: x1, y2};
+    else line = {x1: x2, y1, x2, y2};
+
+    const dashAttr = c.dash ? `stroke-dasharray="${c.dash}"` : '';
+    return `<line class="wall-seg" data-edge="${edge}" x1="${line.x1}" y1="${line.y1}" x2="${line.x2}" y2="${line.y2}" stroke="${c.stroke}" stroke-width="${c.width}" stroke-linecap="round" ${dashAttr} />`;
+  }
+
+  function wallHitArea(edge){
+    // Larger invisible area for easier tap
+    let hit;
+    if(edge === 'N') hit = `x="${x1-10}" y="${y1-16}" width="${x2-x1+20}" height="28"`;
+    else if(edge === 'S') hit = `x="${x1-10}" y="${y2-12}" width="${x2-x1+20}" height="28"`;
+    else if(edge === 'W') hit = `x="${x1-16}" y="${y1-10}" width="28" height="${y2-y1+20}"`;
+    else hit = `x="${x2-12}" y="${y1-10}" width="28" height="${y2-y1+20}"`;
+    return `<rect data-edge="${edge}" ${hit} fill="transparent" style="cursor:pointer;" />`;
+  }
+
+  function edgeLabel(edge){
+    const s = getState(edge);
+    const lbl = colors[s].label;
+    let x, y, anchor = 'middle';
+    if(edge === 'N'){ x = (x1+x2)/2; y = y1 - 18; }
+    else if(edge === 'S'){ x = (x1+x2)/2; y = y2 + 22; }
+    else if(edge === 'W'){ x = x1 - 14; y = (y1+y2)/2; }
+    else { x = x2 + 14; y = (y1+y2)/2; }
+
+    const rot = (edge === 'W') ? `transform="rotate(-90, ${x}, ${y})"` : (edge === 'E') ? `transform="rotate(90, ${x}, ${y})"` : '';
+
+    return `<text x="${x}" y="${y}" text-anchor="${anchor}" dominant-baseline="middle" class="wall-status" ${rot}>${lbl}</text>`;
+  }
+
+  // Compass labels
+  function compassLbl(edge){
+    let x, y;
+    if(edge === 'N'){ x = (x1+x2)/2; y = y1 - 4; }
+    else if(edge === 'S'){ x = (x1+x2)/2; y = y2 + 8; }
+    else if(edge === 'W'){ x = x1 - 4; y = (y1+y2)/2; }
+    else { x = x2 + 4; y = (y1+y2)/2; }
+
+    const rot = (edge === 'W') ? `transform="rotate(-90, ${x}, ${y})"` : (edge === 'E') ? `transform="rotate(90, ${x}, ${y})"` : '';
+    return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" class="wall-lbl" ${rot}>${edge}</text>`;
+  }
+
+  const svgHtml = `
+    <svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg">
+      <!-- Room floor -->
+      <rect x="${x1}" y="${y1}" width="${x2-x1}" height="${y2-y1}" fill="${r.fill}" opacity="0.3" rx="2"/>
+      <!-- Room name in center -->
+      <text x="${(x1+x2)/2}" y="${(y1+y2)/2 - 4}" text-anchor="middle" dominant-baseline="middle" style="font-family:'Cormorant Garamond',serif;font-size:13px;font-weight:500;fill:var(--paper);opacity:0.9;">${r.name.length > 16 ? r.name.split(' ')[0] : r.name}</text>
+      <text x="${(x1+x2)/2}" y="${(y1+y2)/2 + 10}" text-anchor="middle" dominant-baseline="middle" style="font-family:'DM Sans',sans-serif;font-size:9px;fill:var(--muted);">${r.sub || ''}</text>
+      <!-- Walls (visual) -->
+      ${wallSvg('N')}
+      ${wallSvg('S')}
+      ${wallSvg('W')}
+      ${wallSvg('E')}
+      <!-- Hit areas (large invisible tap zones) -->
+      ${wallHitArea('N')}
+      ${wallHitArea('S')}
+      ${wallHitArea('W')}
+      ${wallHitArea('E')}
+      <!-- Compass letters -->
+      ${compassLbl('N')}
+      ${compassLbl('S')}
+      ${compassLbl('W')}
+      ${compassLbl('E')}
+      <!-- Status labels -->
+      ${edgeLabel('N')}
+      ${edgeLabel('S')}
+      ${edgeLabel('W')}
+      ${edgeLabel('E')}
+    </svg>
+  `;
+
+  container.innerHTML = svgHtml;
+
+  // Attach click handlers
+  container.querySelectorAll('[data-edge]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cycleState(el.getAttribute('data-edge'));
+    });
+  });
+}
+
+function openSegmentEditor(){
+  if(!selectedId) return;
+  const r = rooms.find(x => x.id === selectedId);
+  if(!r) return;
+  const el = document.getElementById('segmentEditor');
+  if(el.style.display === 'block'){
+    el.style.display = 'none';
+    return;
+  }
+  renderSegmentEditor(r);
+  el.style.display = 'block';
+}
+
+function renderSegmentEditor(r){
+  const el = document.getElementById('segmentEditor');
+  const wallLengths = {
+    N: r.c2 - r.c1,
+    S: r.c2 - r.c1,
+    E: r.f2 - r.f1,
+    W: r.f2 - r.f1,
+  };
+
+  r.segments = r.segments || {};
+
+  // For each edge, if no segments defined, create default based on current state
+  ['N','S','E','W'].forEach(edge => {
+    if(!r.segments[edge]){
+      let type = 'wall';
+      if((r.noWalls||[]).includes(edge)) type = 'open';
+      else if((r.doors||[]).includes(edge)) type = 'door';
+      else if((r.ventanales||[]).includes(edge)) type = 'vent';
+      r.segments[edge] = [{type, length: wallLengths[edge]}];
+    }
+  });
+
+  const colors = {
+    wall: '#E8E6E0',
+    vent: '#5A8FC0',
+    door: '#8B6F47',
+    open: 'transparent'
+  };
+  const typeNames = {wall:'Muro', vent:'Ventanal', door:'Puerta', open:'Abierta'};
+
+  function renderWallStrip(edge){
+    const totalLen = wallLengths[edge];
+    const segs = r.segments[edge];
+    const sum = segs.reduce((s,seg) => s + seg.length, 0);
+    const VW = 260, VH = 32;
+    let x = 8;
+    const availW = VW - 16;
+    let html = `<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg">`;
+    html += `<rect x="0" y="0" width="${VW}" height="${VH}" fill="#1A1A18"/>`;
+    segs.forEach((seg, i) => {
+      const segW = (seg.length / sum) * availW;
+      const c = colors[seg.type];
+      const dash = seg.type === 'open' ? 'stroke-dasharray="3,2" stroke="#7AAF6E" stroke-width="1.5"' : '';
+      if(seg.type === 'open'){
+        html += `<line x1="${x}" y1="${VH/2}" x2="${x+segW}" y2="${VH/2}" ${dash}/>`;
+      } else {
+        html += `<rect x="${x}" y="${VH/2 - 4}" width="${segW}" height="8" fill="${c}" rx="1"/>`;
+      }
+      // Separator line
+      if(i > 0){
+        html += `<line x1="${x}" y1="4" x2="${x}" y2="${VH-4}" stroke="#3A6035" stroke-width="0.5" stroke-dasharray="2,2"/>`;
+      }
+      // Length label
+      html += `<text x="${x + segW/2}" y="${VH - 4}" text-anchor="middle" font-size="9" fill="#9A9890" font-family="DM Sans">${seg.length.toFixed(1)}m</text>`;
+      x += segW;
+    });
+    html += `</svg>`;
+    return html;
+  }
+
+  function renderEdge(edge){
+    const segs = r.segments[edge];
+    const total = segs.reduce((s,seg) => s + seg.length, 0);
+    const target = wallLengths[edge];
+    const diff = Math.abs(total - target);
+    const isOk = diff < 0.01;
+
+    let segItems = segs.map((seg, i) => `
+      <div class="seg-item">
+        <select onchange="updateSegment('${edge}', ${i}, 'type', this.value)">
+          <option value="wall" ${seg.type==='wall'?'selected':''}>Muro</option>
+          <option value="vent" ${seg.type==='vent'?'selected':''}>Ventanal</option>
+          <option value="door" ${seg.type==='door'?'selected':''}>Puerta</option>
+          <option value="open" ${seg.type==='open'?'selected':''}>Abierta</option>
+        </select>
+        <input type="number" step="0.1" min="0.1" value="${seg.length}" onchange="updateSegment('${edge}', ${i}, 'length', parseFloat(this.value))">
+        <span class="seg-item-unit">m</span>
+        ${segs.length > 1 ? `<button class="seg-del" onclick="deleteSegment('${edge}', ${i})" title="Eliminar">×</button>` : ''}
+      </div>
+    `).join('');
+
+    return `
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <div style="font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;font-weight:600;">Pared ${edge} — ${target.toFixed(1)}m</div>
+        </div>
+        <div class="seg-wallview">${renderWallStrip(edge)}</div>
+        <div class="seg-list">${segItems}</div>
+        <button class="seg-add-btn" onclick="addSegment('${edge}')">+ Agregar sección</button>
+        <div class="seg-total ${isOk ? 'ok' : 'warn'}">Total: ${total.toFixed(2)}m / ${target.toFixed(2)}m ${isOk ? '✓' : '⚠ ajustar'}</div>
+      </div>
+    `;
+  }
+
+  el.innerHTML = `
+    <div class="segment-editor">
+      <div class="seg-header">
+        <div class="seg-title">✂ Secciones por pared</div>
+        <button class="seg-close" onclick="closeSegmentEditor()">×</button>
+      </div>
+      ${renderEdge('N')}
+      ${renderEdge('S')}
+      ${renderEdge('W')}
+      ${renderEdge('E')}
+    </div>
+  `;
+}
+
+function closeSegmentEditor(){
+  document.getElementById('segmentEditor').style.display = 'none';
+}
+
+function updateSegment(edge, idx, field, value){
+  if(!selectedId) return;
+  const r = rooms.find(x => x.id === selectedId);
+  if(!r || !r.segments || !r.segments[edge]) return;
+  r.segments[edge][idx][field] = value;
+  renderSegmentEditor(r);
+  view3dDirty = true;
+  draw(); // refresh main plan to reflect changes
+}
+
+function addSegment(edge){
+  if(!selectedId) return;
+  const r = rooms.find(x => x.id === selectedId);
+  if(!r || !r.segments) return;
+  // Add new segment of 1m (or remaining length if less)
+  const wallLen = edge === 'N' || edge === 'S' ? (r.c2 - r.c1) : (r.f2 - r.f1);
+  const used = r.segments[edge].reduce((s, sg) => s + sg.length, 0);
+  const remaining = Math.max(0.5, wallLen - used);
+  r.segments[edge].push({type: 'wall', length: Math.min(1, remaining)});
+  renderSegmentEditor(r);
+  view3dDirty = true;
+  draw();
+}
+
+function deleteSegment(edge, idx){
+  if(!selectedId) return;
+  const r = rooms.find(x => x.id === selectedId);
+  if(!r || !r.segments || !r.segments[edge]) return;
+  if(r.segments[edge].length <= 1) return;
+  r.segments[edge].splice(idx, 1);
+  renderSegmentEditor(r);
+  view3dDirty = true;
+  draw();
+}
+
+function buildSwatches(sel){
+  const row = document.getElementById('swatches');
+  row.innerHTML = '';
+  COLORS.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'swatch' + (c === sel ? ' sel' : '');
+    d.style.background = c;
+    d.onclick = () => {
+      row.querySelectorAll('.swatch').forEach(x => x.classList.remove('sel'));
+      d.classList.add('sel');
+    };
+    row.appendChild(d);
+  });
+}
+
+function applyEdit(){
+  if(!selectedId) return;
+  const r = rooms.find(x => x.id === selectedId);
+  r.name = document.getElementById('fName').value.toUpperCase();
+  r.sub = document.getElementById('fSub').value;
+  r.cat = document.getElementById('fCat').value;
+  r.c1 = +document.getElementById('fC1').value;
+  r.c2 = +document.getElementById('fC2').value;
+  r.f1 = +document.getElementById('fF1').value;
+  r.f2 = +document.getElementById('fF2').value;
+  r.notes = document.getElementById('fNotes').value;
+  r.material = document.getElementById('fMaterial').value;
+  r.height = +document.getElementById('fHeight').value;
+  const sel = document.querySelector('.swatch.sel');
+  if(sel) r.fill = sel.style.background;
+  // Walls are already updated via wall editor (mutations happen directly on r)
+  r.openArea = document.getElementById('fOpenArea').checked;
+  r.columns = document.getElementById('fColumns').checked;
+  // Invalidate 3D cache
+  view3dDirty = true;
+  if(r.lshape){
+    r.notchC1 = +document.getElementById('fNC1').value;
+    r.notchC2 = +document.getElementById('fNC2').value;
+    r.notchF1 = +document.getElementById('fNF1').value;
+    r.notchF2 = +document.getElementById('fNF2').value;
+  }
+  closePanel(); draw();
+  toast(`✓ ${r.name} actualizado`);
+}
+
+function deleteRoom(){
+  if(!selectedId) return;
+  const r = rooms.find(x => x.id === selectedId);
+  if(!confirm(`¿Eliminar "${r.name}"?`)) return;
+  rooms = rooms.filter(x => x.id !== selectedId);
+  selectedId = null; closePanel(); draw();
+  view3dDirty = true;
+  toast('Eliminado');
+}
+
+function duplicateRoom(){
+  if(!selectedId) return;
+  const r = rooms.find(x => x.id === selectedId);
+  const nr = {...r, id:nextId++, name:r.name+' (2)', c1:r.c1+1, c2:r.c2+1};
+  rooms.push(nr); closePanel(); draw();
+  selectRoom(nr.id);
+  view3dDirty = true;
+}
+
+function closePanel(){
+  selectedId = null;
+  document.getElementById('rightPanel').classList.remove('open');
+  draw();
+}
+
+function addRoom(){
+  const name = prompt('Nombre del nuevo espacio:');
+  if(!name) return;
+  const nr = {id:nextId++, name:name.toUpperCase(), sub:'', cat:'Otro', c1:8, f1:8, c2:12, f2:10, fill:'#F5F2EC', notes:'', material:'', height:2.6};
+  rooms.push(nr); draw(); selectRoom(nr.id);
+  view3dDirty = true;
+}
+
+function toggleGrid(){ showGrid = !showGrid; document.getElementById('gridBtn').classList.toggle('active', showGrid); draw(); }
+function toggleLabels(){ showLabels = !showLabels; document.getElementById('labelBtn').classList.toggle('active', showLabels); draw(); }
+function zoom(f){ zoomLevel = Math.max(0.5, Math.min(3, zoomLevel*f)); draw(); }
+function resetZoom(){ zoomLevel = 1; draw(); }
+
+function switchTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const tabs = ['plan','specs','notes','3d','deco','check'];
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  // Hide all views first
+  ['planView','specsView','notesView','checkView','view3d','decoView'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.display = 'none';
+  });
+  // Show only the active one
+  const displayMap = {
+    plan: ['planView', 'flex'],
+    specs: ['specsView', 'block'],
+    notes: ['notesView', 'block'],
+    check: ['checkView', 'block'],
+    '3d': ['view3d', 'flex'],
+    deco: ['decoView', 'block']
+  };
+  const [viewId, disp] = displayMap[tab] || [];
+  if(viewId) document.getElementById(viewId).style.display = disp;
+  if(tab !== 'plan') closePanel();
+  if(tab === 'specs') updateSpecs();
+  if(tab === 'notes') renderNotes();
+  if(tab === 'check') renderChecklist();
+  if(tab === '3d') view3d.init();
+  if(tab === 'deco') renderDeco();
+}
+
+function updateSpecs(){
+  const totalArea = rooms.reduce((s,r) => s + (r.cat !== 'Exterior' ? +area(r) : 0), 0);
+  const alcobas = rooms.filter(r => r.cat === 'Alcobas').length;
+  const banos = rooms.filter(r => r.cat === 'Baños').length;
+  document.getElementById('statGrid').innerHTML = `
+    <div class="stat-card"><div class="stat-val">${totalArea.toFixed(0)}</div><div class="stat-lbl">m² construidos</div></div>
+    <div class="stat-card"><div class="stat-val">${alcobas}</div><div class="stat-lbl">Alcobas</div></div>
+    <div class="stat-card"><div class="stat-val">${banos}</div><div class="stat-lbl">Baños</div></div>`;
+
+  const cats = {};
+  rooms.forEach(r => { if(!cats[r.cat]) cats[r.cat]=[]; cats[r.cat].push(r); });
+  let html = `<tr><th>Espacio</th><th>Coords</th><th>Área</th><th>Material</th><th>Alt.</th><th>Notas</th></tr>`;
+  let tot = 0;
+  Object.entries(cats).forEach(([cat,rs]) => {
+    html += `<tr><td class="cat-row" colspan="6">${cat}</td></tr>`;
+    rs.forEach(r => {
+      const a = +area(r); tot += a;
+      html += `<tr>
+        <td><span class="dot" style="background:${r.fill};border:1px solid rgba(0,0,0,0.2)"></span>${r.name}${r.sub?` <small style="color:#888">${r.sub}</small>`:''}</td>
+        <td style="color:#666;font-size:10px">C${r.c1}–${r.c2}<br>F${r.f1}–${r.f2}</td>
+        <td style="font-weight:600;color:#7AAF6E">${a} m²</td>
+        <td style="color:#888;font-size:10px">${r.material||'—'}</td>
+        <td style="color:#888;font-size:10px">${r.height?r.height+'m':'—'}</td>
+        <td style="color:#888;font-size:10px">${r.notes||'—'}</td>
+      </tr>`;
+    });
+  });
+  html += `<tr class="total-row"><td colspan="2"><strong>TOTAL</strong></td><td colspan="4"><strong>${tot.toFixed(1)} m²</strong></td></tr>`;
+  document.getElementById('specsTable').innerHTML = html;
+}
+
+function setNoteCat(btn, cat){
+  document.querySelectorAll('.note-cat-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentNoteCat = cat;
+  renderNotes();
+}
+function addNote(){
+  const inp = document.getElementById('noteInput');
+  if(!inp.value.trim()) return;
+  const cat = currentNoteCat === 'Todas' ? 'General' : currentNoteCat;
+  notes.unshift({id:Date.now(), text:inp.value.trim(), cat, ts:'Ahora'});
+  inp.value = ''; renderNotes();
+}
+function deleteNote(id){ notes = notes.filter(n => n.id !== id); renderNotes(); }
+function renderNotes(){
+  const list = document.getElementById('notesList');
+  const filtered = currentNoteCat === 'Todas' ? notes : notes.filter(n => n.cat === currentNoteCat);
+  list.innerHTML = filtered.length ? filtered.map(n => `
+    <div class="note-card">
+      <div class="note-dot"></div>
+      <div class="note-text">${n.text}<div class="note-meta">${n.cat} · ${n.ts}</div></div>
+      <button class="note-del" onclick="deleteNote(${n.id})">×</button>
+    </div>`).join('') : '<div style="color:#9A9890;font-size:12px;padding:20px 0;text-align:center;">Sin notas</div>';
+}
+
+function renderChecklist(){
+  const total = checklist.reduce((s,c) => s + c.items.length, 0);
+  const done = Object.values(checked).filter(Boolean).length;
+  document.getElementById('progressFill').style.width = `${(done/total*100).toFixed(0)}%`;
+  document.getElementById('checkProgress').textContent = `${done} de ${total} completados`;
+  document.getElementById('checkLists').innerHTML = checklist.map(sec => `
+    <div class="check-section">
+      <div class="check-section-title">${sec.cat}</div>
+      ${sec.items.map(item => `
+        <div class="check-item" onclick="toggleCheck('${item.id}',this)">
+          <input type="checkbox" ${checked[item.id]?'checked':''} onclick="event.stopPropagation();toggleCheck('${item.id}',this.closest('.check-item'))">
+          <div>
+            <div class="check-text${checked[item.id]?' done':''}">${item.text}</div>
+            ${item.sub?`<div class="check-sub">${item.sub}</div>`:''}
+          </div>
+        </div>`).join('')}
+    </div>`).join('');
+}
+function toggleCheck(id, el){
+  checked[id] = !checked[id];
+  el.querySelector('input').checked = checked[id];
+  el.querySelector('.check-text').classList.toggle('done', checked[id]);
+  const total = checklist.reduce((s,c) => s + c.items.length, 0);
+  const done = Object.values(checked).filter(Boolean).length;
+  document.getElementById('progressFill').style.width = `${(done/total*100).toFixed(0)}%`;
+  document.getElementById('checkProgress').textContent = `${done} de ${total} completados`;
+}
+
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ═══════════ 3D VIEW ═══════════
+const view3d = (function(){
+  let scene, camera, renderer, raycaster, mouse;
+  let roomMeshes = [];
+  let labelSprites = [];
+  let roofGroup;
+  let initialized = false;
+  let showRoof = false;
+  let showLabels3d = true;
+  let rotX = -0.5, rotY = 0.7, dist = 55;
+  let targetX = 0, targetY = 0, targetZ = 0;
+  let dragStart = null;
+  let info3d;
+
+  function hexToColor(hex){
+    if(hex.startsWith('rgb')){
+      const m = hex.match(/\d+/g);
+      return new THREE.Color(m[0]/255, m[1]/255, m[2]/255);
+    }
+    return new THREE.Color(hex);
+  }
+
+  function buildScene(){
+    const container = document.getElementById('threejs-container');
+    container.innerHTML = '';
+
+    scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x1A2620, 40, 120);
+
+    // Force layout to ensure container has real dimensions
+    const w = container.clientWidth || window.innerWidth;
+    const h = container.clientHeight || (window.innerHeight - 120);
+    camera = new THREE.PerspectiveCamera(45, w/h, 0.1, 200);
+    updateCamera();
+
+    renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(w, h);
+    renderer.setClearColor(0x000000, 0);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    // Lighting
+    const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+    scene.add(ambient);
+    const sun = new THREE.DirectionalLight(0xFFF5E0, 0.9);
+    sun.position.set(25, 40, 20);
+    sun.castShadow = true;
+    sun.shadow.mapSize.width = 2048;
+    sun.shadow.mapSize.height = 2048;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 100;
+    sun.shadow.camera.left = -30;
+    sun.shadow.camera.right = 30;
+    sun.shadow.camera.top = 30;
+    sun.shadow.camera.bottom = -30;
+    scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0xAFD4FF, 0.2);
+    fill.position.set(-15, 20, -15);
+    scene.add(fill);
+
+    // Ground / terreno base
+    const terrenoGeo = new THREE.PlaneGeometry(32, 34);
+    const terrenoMat = new THREE.MeshStandardMaterial({color: 0x8BB878, roughness: 0.95});
+    const terreno = new THREE.Mesh(terrenoGeo, terrenoMat);
+    terreno.rotation.x = -Math.PI / 2;
+    terreno.position.set(16, 0, 17);
+    terreno.receiveShadow = true;
+    scene.add(terreno);
+
+    // Lush grass layer (slightly raised) — vivid green zones for "zonas verdes"
+    const grassGeo = new THREE.PlaneGeometry(32, 34);
+    const grassMat = new THREE.MeshStandardMaterial({
+      color: 0x6AA85C,
+      roughness: 1.0,
+      transparent: true,
+      opacity: 0.6,
+    });
+    const grass = new THREE.Mesh(grassGeo, grassMat);
+    grass.rotation.x = -Math.PI / 2;
+    grass.position.set(16, 0.008, 17);
+    grass.receiveShadow = true;
+    scene.add(grass);
+
+    // Add some decorative trees / plants around the perimeter (non-built areas)
+    const treePositions = [
+      // North side (between top of terreno and house)
+      {x:2, z:3}, {x:8, z:2.5}, {x:16, z:2}, {x:24, z:2.5}, {x:29, z:3},
+      // South side (below parqueadero/puerta)
+      {x:3, z:31}, {x:8, z:32}, {x:28, z:32},
+      // West side (left of terraza and alcoba principal)
+      {x:2, z:12}, {x:2, z:18}, {x:3, z:24},
+      // East side (right of alcobas)
+      {x:27, z:12}, {x:28, z:18}, {x:28, z:24}, {x:27, z:28},
+    ];
+    treePositions.forEach(t => {
+      // Tree trunk
+      const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 1.2, 6);
+      const trunkMat = new THREE.MeshStandardMaterial({color: 0x6B4A2A, roughness: 0.9});
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.position.set(t.x, 0.6, t.z);
+      trunk.castShadow = true;
+      scene.add(trunk);
+      // Foliage (sphere)
+      const folGeo = new THREE.SphereGeometry(0.8 + Math.random()*0.3, 10, 8);
+      const folMat = new THREE.MeshStandardMaterial({color: 0x4A7A3E, roughness: 0.95, flatShading: true});
+      const fol = new THREE.Mesh(folGeo, folMat);
+      fol.position.set(t.x, 1.6, t.z);
+      fol.castShadow = true;
+      fol.scale.y = 1.1;
+      scene.add(fol);
+    });
+
+    // Small shrubs/bushes scattered
+    const bushPositions = [
+      {x:4, z:5}, {x:26, z:5}, {x:5, z:15}, {x:4, z:21}, {x:26, z:21},
+      {x:11, z:31}, {x:20, z:31},
+    ];
+    bushPositions.forEach(b => {
+      const bushGeo = new THREE.SphereGeometry(0.35, 8, 6);
+      const bushMat = new THREE.MeshStandardMaterial({color: 0x5A9A4C, roughness: 0.95, flatShading: true});
+      const bush = new THREE.Mesh(bushGeo, bushMat);
+      bush.position.set(b.x, 0.3, b.z);
+      bush.castShadow = true;
+      bush.scale.y = 0.7;
+      scene.add(bush);
+    });
+
+    // Grid lines on terreno
+    const gridHelper = new THREE.GridHelper(32, 32, 0x3A6035, 0x3A6035);
+    gridHelper.material.opacity = 0.2;
+    gridHelper.material.transparent = true;
+    gridHelper.position.set(16, 0.01, 16);
+    scene.add(gridHelper);
+
+    // Rooms
+    roomMeshes = [];
+    labelSprites = [];
+    rooms.forEach(r => addRoomMesh(r));
+
+    // Roof
+    roofGroup = new THREE.Group();
+    rooms.forEach(r => {
+      if(r.cat === 'Exterior' || r.cat === 'Servicio') return;
+      const wallH = r.height || 2.6;
+      if(wallH === 0) return;
+      const w = r.c2 - r.c1;
+      const h = r.f2 - r.f1;
+      const roofGeo = new THREE.BoxGeometry(w, 0.15, h);
+      const roofMat = new THREE.MeshStandardMaterial({color: 0x4A3A2E, roughness: 0.7});
+      const roof = new THREE.Mesh(roofGeo, roofMat);
+      roof.position.set(r.c1 + w/2, wallH + 0.08, r.f1 + h/2);
+      roof.castShadow = true;
+      roofGroup.add(roof);
+    });
+    roofGroup.visible = showRoof;
+    scene.add(roofGroup);
+
+    // Mirador markers (green zone)
+    const mirGeo = new THREE.PlaneGeometry(mirador.c2 - mirador.c1, mirador.f2 - mirador.f1);
+    const mirMat = new THREE.MeshStandardMaterial({color: 0x7AAA70, roughness: 0.9, transparent: true, opacity: 0.7});
+    const mir = new THREE.Mesh(mirGeo, mirMat);
+    mir.rotation.x = -Math.PI / 2;
+    mir.position.set(mirador.c1 + (mirador.c2-mirador.c1)/2, 0.02, mirador.f1 + (mirador.f2-mirador.f1)/2);
+    scene.add(mir);
+
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
+
+    setupInteraction();
+    animate();
+  }
+
+  function addRoomMesh(r){
+    const w = r.c2 - r.c1;
+    const h = r.f2 - r.f1;
+    const wallH = r.height || 2.6;
+
+    if(wallH === 0){
+      // Floor only (exterior zones, terraza)
+      const geo = new THREE.PlaneGeometry(w, h);
+      const mat = new THREE.MeshStandardMaterial({
+        color: hexToColor(r.fill),
+        roughness: 0.8,
+        transparent: true,
+        opacity: 0.85,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(r.c1 + w/2, 0.015, r.f1 + h/2);
+      mesh.receiveShadow = true;
+      mesh.userData.room = r;
+      scene.add(mesh);
+      roomMeshes.push(mesh);
+      return;
+    }
+
+    // Floor (always draw)
+    const floorGeo = new THREE.PlaneGeometry(w, h);
+    const floorMat = new THREE.MeshStandardMaterial({color: hexToColor(r.fill), roughness: 0.6});
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(r.c1 + w/2, 0.02, r.f1 + h/2);
+    floor.receiveShadow = true;
+    floor.userData.room = r;
+    scene.add(floor);
+    roomMeshes.push(floor);
+
+    // If open area (salón, comedor, cocina) — skip walls entirely
+    if(r.openArea){
+      // Add optional ventanales only
+      if(r.ventanales){
+        r.ventanales.forEach(edge => addVentanal(r, edge, wallH));
+      }
+      // Label
+      if(w > 2 && h > 2){
+        const sprite = makeLabel(r.name, r.sub);
+        sprite.position.set(r.c1 + w/2, wallH*0.6, r.f1 + h/2);
+        sprite.userData.room = r;
+        scene.add(sprite);
+        labelSprites.push(sprite);
+      }
+      return;
+    }
+
+    // Solid walls
+    const wallThick = 0.15;
+    const wallMat = new THREE.MeshStandardMaterial({
+      color: hexToColor(r.fill),
+      roughness: 0.85,
+      transparent: true,
+      opacity: 0.88,
+    });
+
+    const ventanales = r.ventanales || [];
+
+    const noWalls = r.noWalls || [];
+    const doors = r.doors || [];
+
+    // Helper: build wall with optional door opening and segment support
+    function buildWall(edge, isNS){
+      const totalLen = isNS ? w : h;
+      const wallAxis = edge === 'N' ? r.f1 : edge === 'S' ? r.f2 : edge === 'W' ? r.c1 : r.c2;
+      const startCoord = isNS ? r.c1 : r.f1;
+
+      // If segments are defined, use them
+      if(r.segments && r.segments[edge] && r.segments[edge].length > 0){
+        const segs = r.segments[edge];
+        const totalDef = segs.reduce((s, sg) => s + sg.length, 0);
+        const ratio = totalLen / totalDef; // normalize in case user values don't match
+
+        let cursor = 0;
+        segs.forEach(seg => {
+          const segLen = seg.length * ratio;
+          const segCenter = startCoord + cursor + segLen/2;
+
+          if(seg.type === 'open'){
+            // skip - nothing to build
+          } else if(seg.type === 'vent'){
+            // Build glass segment
+            buildGlassSegment(edge, isNS, segCenter, segLen, wallAxis, wallH);
+          } else if(seg.type === 'door'){
+            // Build door opening
+            buildDoorSegment(edge, isNS, segCenter, segLen, wallAxis, wallH);
+          } else {
+            // Solid wall segment
+            const geo = isNS ? new THREE.BoxGeometry(segLen, wallH, wallThick) : new THREE.BoxGeometry(wallThick, wallH, segLen);
+            const m = new THREE.Mesh(geo, wallMat);
+            if(isNS) m.position.set(segCenter, wallH/2, wallAxis);
+            else m.position.set(wallAxis, wallH/2, segCenter);
+            m.castShadow = true; m.receiveShadow = true;
+            m.userData.room = r;
+            scene.add(m); roomMeshes.push(m);
+          }
+          cursor += segLen;
+        });
+        return;
+      }
+
+      // Legacy fallback (no segments): check global flags
+      if(noWalls.includes(edge)) return;
+      if(ventanales.includes(edge)){ addVentanal(r, edge, wallH); return; }
+
+      const hasDoor = doors.includes(edge);
+      const doorW = 0.9;
+      const doorH = 2.1;
+
+      if(!hasDoor){
+        const geo = isNS ? new THREE.BoxGeometry(totalLen, wallH, wallThick) : new THREE.BoxGeometry(wallThick, wallH, totalLen);
+        const m = new THREE.Mesh(geo, wallMat);
+        if(isNS) m.position.set(r.c1 + w/2, wallH/2, wallAxis);
+        else m.position.set(wallAxis, wallH/2, r.f1 + h/2);
+        m.castShadow = true; m.receiveShadow = true;
+        m.userData.room = r;
+        scene.add(m); roomMeshes.push(m);
+      } else {
+        // Wall with door gap: 3 segments (left, lintel above door, right)
+        const doorPos = 0.5; // center of wall
+        const segLen1 = (totalLen - doorW) / 2;
+        const segLen2 = segLen1;
+
+        // Left segment (full height)
+        if(segLen1 > 0.05){
+          const g1 = isNS ? new THREE.BoxGeometry(segLen1, wallH, wallThick) : new THREE.BoxGeometry(wallThick, wallH, segLen1);
+          const m1 = new THREE.Mesh(g1, wallMat);
+          if(isNS) m1.position.set(r.c1 + segLen1/2, wallH/2, wallAxis);
+          else m1.position.set(wallAxis, wallH/2, r.f1 + segLen1/2);
+          m1.castShadow = true; m1.receiveShadow = true;
+          m1.userData.room = r;
+          scene.add(m1); roomMeshes.push(m1);
+        }
+        // Right segment (full height)
+        if(segLen2 > 0.05){
+          const g2 = isNS ? new THREE.BoxGeometry(segLen2, wallH, wallThick) : new THREE.BoxGeometry(wallThick, wallH, segLen2);
+          const m2 = new THREE.Mesh(g2, wallMat);
+          if(isNS) m2.position.set(r.c2 - segLen2/2, wallH/2, wallAxis);
+          else m2.position.set(wallAxis, wallH/2, r.f2 - segLen2/2);
+          m2.castShadow = true; m2.receiveShadow = true;
+          m2.userData.room = r;
+          scene.add(m2); roomMeshes.push(m2);
+        }
+        // Lintel (above door)
+        const lintelH = wallH - doorH;
+        if(lintelH > 0.05){
+          const gL = isNS ? new THREE.BoxGeometry(doorW, lintelH, wallThick) : new THREE.BoxGeometry(wallThick, lintelH, doorW);
+          const mL = new THREE.Mesh(gL, wallMat);
+          if(isNS) mL.position.set(r.c1 + w/2, doorH + lintelH/2, wallAxis);
+          else mL.position.set(wallAxis, doorH + lintelH/2, r.f1 + h/2);
+          mL.castShadow = true; mL.receiveShadow = true;
+          mL.userData.room = r;
+          scene.add(mL); roomMeshes.push(mL);
+        }
+        // Door leaf (wood)
+        const doorMat = new THREE.MeshStandardMaterial({color: 0x8B6F47, roughness: 0.8});
+        const doorGeo = isNS ? new THREE.BoxGeometry(doorW*0.95, doorH, 0.05) : new THREE.BoxGeometry(0.05, doorH, doorW*0.95);
+        const door = new THREE.Mesh(doorGeo, doorMat);
+        // Position slightly open (rotated)
+        if(isNS){
+          const pivot = new THREE.Group();
+          pivot.position.set(r.c1 + w/2 - doorW/2, doorH/2, wallAxis);
+          door.position.set(doorW/2, 0, 0);
+          pivot.add(door);
+          pivot.rotation.y = -Math.PI/6; // 30deg open
+          scene.add(pivot);
+        } else {
+          const pivot = new THREE.Group();
+          pivot.position.set(wallAxis, doorH/2, r.f1 + h/2 - doorW/2);
+          door.position.set(0, 0, doorW/2);
+          pivot.add(door);
+          pivot.rotation.y = Math.PI/6;
+          scene.add(pivot);
+        }
+        door.castShadow = true;
+      }
+    }
+
+    buildWall('N', true);
+    buildWall('S', true);
+    buildWall('W', false);
+    buildWall('E', false);
+
+    // Columns for covered spaces (like garage with open walls)
+    if(r.columns && r.noWalls){
+      const colMat = new THREE.MeshStandardMaterial({color: 0xE8E2D5, roughness: 0.7});
+      const colSize = 0.3;
+      const roofThick = 0.15;
+      const positions = [];
+
+      // Add columns at corners where walls are open
+      const hasNoS = r.noWalls.includes('S');
+      const hasNoN = r.noWalls.includes('N');
+      const hasNoE = r.noWalls.includes('E');
+      const hasNoW = r.noWalls.includes('W');
+
+      if(hasNoS){
+        // SW and SE corners
+        positions.push([r.c1, r.f2], [r.c2, r.f2]);
+        // Midpoint of south edge if width > 4m
+        if(w > 4) positions.push([r.c1 + w/2, r.f2]);
+      }
+      if(hasNoN){
+        positions.push([r.c1, r.f1], [r.c2, r.f1]);
+        if(w > 4) positions.push([r.c1 + w/2, r.f1]);
+      }
+      if(hasNoE && !hasNoS){
+        positions.push([r.c2, r.f2]);
+      }
+      if(hasNoE && !hasNoN){
+        positions.push([r.c2, r.f1]);
+      }
+      if(hasNoW && !hasNoS){
+        positions.push([r.c1, r.f2]);
+      }
+      if(hasNoW && !hasNoN){
+        positions.push([r.c1, r.f1]);
+      }
+      // Midpoint of long edges
+      if(hasNoE && h > 4) positions.push([r.c2, r.f1 + h/2]);
+      if(hasNoW && h > 4) positions.push([r.c1, r.f1 + h/2]);
+
+      // Dedupe
+      const seen = new Set();
+      positions.forEach(([px, pz]) => {
+        const key = `${px},${pz}`;
+        if(seen.has(key)) return;
+        seen.add(key);
+        const col = new THREE.Mesh(
+          new THREE.BoxGeometry(colSize, wallH, colSize),
+          colMat
+        );
+        col.position.set(px, wallH/2, pz);
+        col.castShadow = true;
+        col.receiveShadow = true;
+        col.userData.room = r;
+        scene.add(col);
+        roomMeshes.push(col);
+      });
+
+      // Roof slab above the room (garage has its own roof since it's covered)
+      const roofGeo = new THREE.BoxGeometry(w + 0.2, roofThick, h + 0.2);
+      const roofMat = new THREE.MeshStandardMaterial({color: 0x4A3A2E, roughness: 0.7});
+      const coveredRoof = new THREE.Mesh(roofGeo, roofMat);
+      coveredRoof.position.set(r.c1 + w/2, wallH + roofThick/2, r.f1 + h/2);
+      coveredRoof.castShadow = true;
+      scene.add(coveredRoof);
+      roomMeshes.push(coveredRoof);
+    }
+
+    // Label
+    if(w > 2 && h > 2){
+      const sprite = makeLabel(r.name, r.sub);
+      sprite.position.set(r.c1 + w/2, wallH*0.75, r.f1 + h/2);
+      sprite.userData.room = r;
+      scene.add(sprite);
+      labelSprites.push(sprite);
+    }
+  }
+
+  function addVentanal(r, edge, wallH){
+    const w = r.c2 - r.c1;
+    const h = r.f2 - r.f1;
+    const glassThick = 0.08;
+    const glassH = wallH - 0.3; // leave top and bottom margin
+    const glassY = wallH/2;
+
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0x9FCADC,
+      metalness: 0.2,
+      roughness: 0.08,
+      transmission: 0.7,
+      transparent: true,
+      opacity: 0.55,
+      reflectivity: 0.5,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+      side: THREE.DoubleSide,
+      envMapIntensity: 1.5,
+    });
+    const frameMat = new THREE.MeshStandardMaterial({color: 0x2A2A28, roughness: 0.4, metalness: 0.3});
+
+    let glass, frameTop, frameBot, frameL, frameR;
+
+    if(edge === 'N' || edge === 'S'){
+      const zPos = edge === 'N' ? r.f1 : r.f2;
+      glass = new THREE.Mesh(new THREE.BoxGeometry(w - 0.2, glassH, glassThick), glassMat);
+      glass.position.set(r.c1 + w/2, glassY, zPos);
+      scene.add(glass); roomMeshes.push(glass);
+      glass.userData.room = r;
+
+      // Top/Bottom horizontal frames
+      frameTop = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, glassThick*1.4), frameMat);
+      frameTop.position.set(r.c1 + w/2, wallH - 0.06, zPos);
+      scene.add(frameTop);
+      frameBot = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, glassThick*1.4), frameMat);
+      frameBot.position.set(r.c1 + w/2, 0.09, zPos);
+      scene.add(frameBot);
+
+      // Left/Right vertical frames (corners)
+      const fL = new THREE.Mesh(new THREE.BoxGeometry(0.15, wallH, glassThick*1.4), frameMat);
+      fL.position.set(r.c1, wallH/2, zPos);
+      scene.add(fL);
+      const fR = new THREE.Mesh(new THREE.BoxGeometry(0.15, wallH, glassThick*1.4), frameMat);
+      fR.position.set(r.c2, wallH/2, zPos);
+      scene.add(fR);
+
+      // Middle vertical divider (for large ventanales > 3m)
+      if(w > 3){
+        const fM = new THREE.Mesh(new THREE.BoxGeometry(0.1, glassH, glassThick*1.2), frameMat);
+        fM.position.set(r.c1 + w/2, glassY, zPos);
+        scene.add(fM);
+      }
+    } else {
+      const xPos = edge === 'W' ? r.c1 : r.c2;
+      glass = new THREE.Mesh(new THREE.BoxGeometry(glassThick, glassH, h - 0.2), glassMat);
+      glass.position.set(xPos, glassY, r.f1 + h/2);
+      scene.add(glass); roomMeshes.push(glass);
+      glass.userData.room = r;
+
+      frameTop = new THREE.Mesh(new THREE.BoxGeometry(glassThick*1.4, 0.12, h), frameMat);
+      frameTop.position.set(xPos, wallH - 0.06, r.f1 + h/2);
+      scene.add(frameTop);
+      frameBot = new THREE.Mesh(new THREE.BoxGeometry(glassThick*1.4, 0.18, h), frameMat);
+      frameBot.position.set(xPos, 0.09, r.f1 + h/2);
+      scene.add(frameBot);
+
+      // Top/bottom end frames (corners)
+      const fT = new THREE.Mesh(new THREE.BoxGeometry(glassThick*1.4, wallH, 0.15), frameMat);
+      fT.position.set(xPos, wallH/2, r.f1);
+      scene.add(fT);
+      const fB = new THREE.Mesh(new THREE.BoxGeometry(glassThick*1.4, wallH, 0.15), frameMat);
+      fB.position.set(xPos, wallH/2, r.f2);
+      scene.add(fB);
+
+      // Middle horizontal divider
+      if(h > 3){
+        const fM = new THREE.Mesh(new THREE.BoxGeometry(glassThick*1.2, glassH, 0.1), frameMat);
+        fM.position.set(xPos, glassY, r.f1 + h/2);
+        scene.add(fM);
+      }
+    }
+  }
+
+  function makeLabel(name, sub){
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 160;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(28,28,26,0.85)';
+    ctx.fillRect(0, 0, 512, 160);
+    ctx.strokeStyle = 'rgba(122,175,110,0.5)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(2, 2, 508, 156);
+
+    ctx.fillStyle = '#FBF9F4';
+    ctx.font = '700 46px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name, 256, sub ? 60 : 80);
+
+    if(sub){
+      ctx.fillStyle = '#9A9890';
+      ctx.font = '300 32px DM Sans, sans-serif';
+      ctx.fillText(sub, 256, 110);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({map: texture, transparent: true});
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(3.2, 1.0, 1);
+    return sprite;
+  }
+
+  function updateCamera(){
+    const cx = Math.cos(rotY) * Math.cos(rotX) * dist;
+    const cy = Math.sin(rotX) * dist;
+    const cz = Math.sin(rotY) * Math.cos(rotX) * dist;
+    camera.position.set(16 + cx, cy + 5, 17 + cz);
+    camera.lookAt(16, 2, 17);
+  }
+
+  function setupInteraction(){
+    const canvas = renderer.domElement;
+    info3d = document.getElementById('info3d');
+
+    let lastX, lastY;
+    let pinchStart = null;
+
+    canvas.addEventListener('mousedown', (e) => {
+      dragStart = {x: e.clientX, y: e.clientY};
+      lastX = e.clientX; lastY = e.clientY;
+    });
+    canvas.addEventListener('mousemove', (e) => {
+      if(dragStart){
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        rotY -= dx * 0.008;
+        rotX -= dy * 0.008;
+        rotX = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, rotX));
+        lastX = e.clientX; lastY = e.clientY;
+        updateCamera();
+      }
+    });
+    canvas.addEventListener('mouseup', (e) => {
+      const wasDrag = dragStart && (Math.abs(e.clientX - dragStart.x) > 3 || Math.abs(e.clientY - dragStart.y) > 3);
+      if(!wasDrag){ handleClick(e); }
+      dragStart = null;
+    });
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      dist *= e.deltaY > 0 ? 1.1 : 0.91;
+      dist = Math.max(15, Math.min(100, dist));
+      updateCamera();
+    }, {passive: false});
+
+    // Touch
+    canvas.addEventListener('touchstart', (e) => {
+      if(e.touches.length === 1){
+        dragStart = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+      } else if(e.touches.length === 2){
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinchStart = {dist: Math.hypot(dx, dy), camDist: dist};
+      }
+    }, {passive: false});
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if(e.touches.length === 1 && dragStart){
+        const dx = e.touches[0].clientX - lastX;
+        const dy = e.touches[0].clientY - lastY;
+        rotY -= dx * 0.008;
+        rotX -= dy * 0.008;
+        rotX = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, rotX));
+        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+        updateCamera();
+      } else if(e.touches.length === 2 && pinchStart){
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const newDist = Math.hypot(dx, dy);
+        dist = pinchStart.camDist * (pinchStart.dist / newDist);
+        dist = Math.max(15, Math.min(100, dist));
+        updateCamera();
+      }
+    }, {passive: false});
+    canvas.addEventListener('touchend', () => {
+      dragStart = null; pinchStart = null;
+    });
+  }
+
+  function handleClick(e){
+    const rect = renderer.domElement.getBoundingClientRect();
+    const x = (e.clientX || (e.changedTouches && e.changedTouches[0].clientX)) - rect.left;
+    const y = (e.clientY || (e.changedTouches && e.changedTouches[0].clientY)) - rect.top;
+    mouse.x = (x / rect.width) * 2 - 1;
+    mouse.y = -(y / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(roomMeshes);
+    if(hits.length > 0){
+      const r = hits[0].object.userData.room;
+      if(r){
+        info3d.innerHTML = `<strong style="color:#7AAF6E">${r.name}</strong>${r.sub?' · '+r.sub:''} <span style="color:#aaa">· ${area(r)} m² · alt. ${r.height||'—'}m</span>`;
+        info3d.style.opacity = '1';
+        clearTimeout(info3d._t);
+        info3d._t = setTimeout(() => info3d.style.opacity = '0', 3500);
+      }
+    }
+  }
+
+  function animate(){
+    if(currentTab !== '3d') return;
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+
+  function buildGlassSegment(edge, isNS, center, segLen, wallAxis, wallH){
+    const glassThick = 0.08;
+    const glassH = wallH - 0.3;
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0x9FCADC, metalness: 0.2, roughness: 0.08,
+      transmission: 0.7, transparent: true, opacity: 0.55,
+      reflectivity: 0.5, clearcoat: 1.0, clearcoatRoughness: 0.05,
+      side: THREE.DoubleSide,
+    });
+    const frameMat = new THREE.MeshStandardMaterial({color: 0x2A2A28, roughness: 0.4, metalness: 0.3});
+
+    let glass;
+    if(isNS){
+      glass = new THREE.Mesh(new THREE.BoxGeometry(segLen - 0.1, glassH, glassThick), glassMat);
+      glass.position.set(center, wallH/2, wallAxis);
+    } else {
+      glass = new THREE.Mesh(new THREE.BoxGeometry(glassThick, glassH, segLen - 0.1), glassMat);
+      glass.position.set(wallAxis, wallH/2, center);
+    }
+    scene.add(glass); roomMeshes.push(glass);
+
+    // Top/bottom frames
+    if(isNS){
+      const top = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.12, glassThick*1.4), frameMat);
+      top.position.set(center, wallH - 0.06, wallAxis);
+      scene.add(top);
+      const bot = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.18, glassThick*1.4), frameMat);
+      bot.position.set(center, 0.09, wallAxis);
+      scene.add(bot);
+    } else {
+      const top = new THREE.Mesh(new THREE.BoxGeometry(glassThick*1.4, 0.12, segLen), frameMat);
+      top.position.set(wallAxis, wallH - 0.06, center);
+      scene.add(top);
+      const bot = new THREE.Mesh(new THREE.BoxGeometry(glassThick*1.4, 0.18, segLen), frameMat);
+      bot.position.set(wallAxis, 0.09, center);
+      scene.add(bot);
+    }
+  }
+
+  function buildDoorSegment(edge, isNS, center, segLen, wallAxis, wallH){
+    const wallThick = 0.15;
+    const doorW = Math.min(0.9, segLen * 0.9);
+    const doorH = 2.1;
+    const lintelH = wallH - doorH;
+
+    const wallMat = new THREE.MeshStandardMaterial({
+      color: 0xF8F6F1, roughness: 0.85, transparent: true, opacity: 0.88,
+    });
+
+    // Side pieces (wall on both sides of door)
+    const sidePieceW = (segLen - doorW) / 2;
+    if(sidePieceW > 0.05){
+      if(isNS){
+        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(sidePieceW, wallH, wallThick), wallMat);
+        leftWall.position.set(center - segLen/2 + sidePieceW/2, wallH/2, wallAxis);
+        leftWall.castShadow = true;
+        scene.add(leftWall); roomMeshes.push(leftWall);
+
+        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(sidePieceW, wallH, wallThick), wallMat);
+        rightWall.position.set(center + segLen/2 - sidePieceW/2, wallH/2, wallAxis);
+        rightWall.castShadow = true;
+        scene.add(rightWall); roomMeshes.push(rightWall);
+      } else {
+        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, sidePieceW), wallMat);
+        leftWall.position.set(wallAxis, wallH/2, center - segLen/2 + sidePieceW/2);
+        leftWall.castShadow = true;
+        scene.add(leftWall); roomMeshes.push(leftWall);
+
+        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, sidePieceW), wallMat);
+        rightWall.position.set(wallAxis, wallH/2, center + segLen/2 - sidePieceW/2);
+        rightWall.castShadow = true;
+        scene.add(rightWall); roomMeshes.push(rightWall);
+      }
+    }
+
+    // Lintel (above door)
+    if(lintelH > 0.05){
+      const geo = isNS ? new THREE.BoxGeometry(doorW, lintelH, wallThick) : new THREE.BoxGeometry(wallThick, lintelH, doorW);
+      const lintel = new THREE.Mesh(geo, wallMat);
+      if(isNS) lintel.position.set(center, doorH + lintelH/2, wallAxis);
+      else lintel.position.set(wallAxis, doorH + lintelH/2, center);
+      lintel.castShadow = true;
+      scene.add(lintel); roomMeshes.push(lintel);
+    }
+
+    // Door leaf
+    const doorMat = new THREE.MeshStandardMaterial({color: 0x8B6F47, roughness: 0.8});
+    const doorGeo = isNS ? new THREE.BoxGeometry(doorW*0.95, doorH, 0.05) : new THREE.BoxGeometry(0.05, doorH, doorW*0.95);
+    const door = new THREE.Mesh(doorGeo, doorMat);
+    if(isNS){
+      const pivot = new THREE.Group();
+      pivot.position.set(center - doorW/2, doorH/2, wallAxis);
+      door.position.set(doorW/2, 0, 0);
+      pivot.add(door);
+      pivot.rotation.y = -Math.PI/6;
+      scene.add(pivot);
+    } else {
+      const pivot = new THREE.Group();
+      pivot.position.set(wallAxis, doorH/2, center - doorW/2);
+      door.position.set(0, 0, doorW/2);
+      pivot.add(door);
+      pivot.rotation.y = Math.PI/6;
+      scene.add(pivot);
+    }
+    door.castShadow = true;
+  }
+
+  return {
+    init(){
+      if(!initialized){
+        setTimeout(() => { buildScene(); initialized = true; view3dDirty = false;
+          setTimeout(() => this.resize(), 100);
+        }, 80);
+      } else if(view3dDirty){
+        buildScene(); view3dDirty = false;
+        setTimeout(() => this.resize(), 100);
+      } else {
+        setTimeout(() => this.resize(), 100);
+      }
+    },
+    resetCamera(){
+      rotX = -0.5; rotY = 0.7; dist = 55;
+      updateCamera();
+    },
+    toggleRoof(){
+      showRoof = !showRoof;
+      if(roofGroup) roofGroup.visible = showRoof;
+      document.getElementById('roofBtn').classList.toggle('active', showRoof);
+    },
+    toggleLabels3d(){
+      showLabels3d = !showLabels3d;
+      labelSprites.forEach(s => s.visible = showLabels3d);
+      document.getElementById('labels3dBtn').classList.toggle('active', showLabels3d);
+    },
+    resize(){
+      if(!initialized || !renderer) return;
+      const container = document.getElementById('threejs-container');
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w/h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+  };
+})();
+
+// ═══════════ DECORACIÓN ═══════════
+const decoData = {
+  'ALCOBA PRINCIPAL': {
+    concept: 'Santuario sofisticado — refugio de descanso con textiles nobles y paleta cálida',
+    paleta: ['#E8DCC4','#8B6F47','#D4B896','#3A3028'],
+    paletaNames:['Lino crudo','Nogal','Arena','Café tabaco'],
+    elementos: [
+      'Cama king con cabecera tapizada en lino o boucle color arena',
+      'Mesas de noche en madera de nogal con lámparas de latón cepillado',
+      'Alfombra de lana gruesa 2.4×3m en tonos neutros con textura',
+      'Cortinas blackout de doble capa: velo translúcido + lino pesado',
+      'Banco al pie de cama en cuero envejecido coñac',
+      'Obras de arte abstractas grandes sobre cabecera'
+    ],
+    iluminacion: 'Plafón central regulable + apliques de lectura + lámparas mesa (3 fuentes)',
+    acabados: 'Piso madera ingeniería roble europeo, muros en micro-cemento mate tono hueso'
+  },
+  'ALCOBA 1': {
+    concept: 'Elegante y luminosa — estilo contemporáneo con frescura mediterránea',
+    paleta: ['#FFFFFF','#E8E2D5','#B8A890','#2D4A3E'],
+    paletaNames:['Blanco puro','Marfil','Beige tostado','Verde bosque'],
+    elementos: [
+      'Cama queen con cabecera en mimbre natural o rattan trenzado',
+      'Mesas flotantes tipo repisa en madera clara',
+      'Silla de lectura tipo Egg en bouclé blanco',
+      'Espejo redondo grande con marco orgánico',
+      'Plantas naturales: kentia o helecho en macetero de barro',
+      'Linos cama: fundas naturales y throw verde salvia'
+    ],
+    iluminacion: 'Lámpara suspendida de ratán + apliques murales + lámpara pie',
+    acabados: 'Piso madera clara, muros texturizados tono blanco roto'
+  },
+  'ALCOBA 2': {
+    concept: 'Relajada y orgánica — estilo Japandi con maderas nobles',
+    paleta: ['#F2EBE0','#C9A87F','#7A6550','#1E2A26'],
+    paletaNames:['Crema suave','Roble miel','Café tostado','Verde profundo'],
+    elementos: [
+      'Cama queen estilo plataforma baja en roble natural',
+      'Mesa de noche minimalista con cajón oculto',
+      'Alfombra de yute o sisal con dimensiones generosas',
+      'Perchero escultórico de madera como elemento decorativo',
+      'Papel tapiz sutil de fibra natural en muro cabecera',
+      'Ropa de cama en tonos tierra con mantas de punto grueso'
+    ],
+    iluminacion: 'Apliques de papel japonés + dimmer + lectura individual LED cálida',
+    acabados: 'Piso madera, cielo raso con listones de madera en acento'
+  },
+  'BAÑO': {
+    concept: 'Spa contemporáneo — espacio ritual con materiales táctiles',
+    paleta: ['#E8E2D5','#9A8B73','#4A5D4E','#2A2522'],
+    paletaNames:['Travertino','Taupe','Eucalipto','Grafito'],
+    elementos: [
+      'Gres porcelánico efecto travertino 60×120cm en piso y muros',
+      'Lavamanos de piedra natural sobre mueble flotante de madera',
+      'Grifería de latón cepillado color champagne',
+      'Espejo con retroiluminación LED circular',
+      'Ducha tipo lluvia techo + handshower + banca teca',
+      'Accesorios: dispensadores de cerámica mate, toallas waffle'
+    ],
+    iluminacion: 'LED cálida en espejo + plafones empotrados + luz de acento ducha',
+    acabados: 'Piso y muros ducha gres travertino, muro acento micro-cemento'
+  },
+  'BAÑO SOCIAL': {
+    concept: 'Joya escultórica — baño de visitas para impresionar',
+    paleta: ['#1C1C1A','#D4AF7A','#EDE7DA','#6B5A3E'],
+    paletaNames:['Negro mate','Oro mate','Crema','Bronce'],
+    elementos: [
+      'Lavamanos escultórico en piedra o cerámica artesanal',
+      'Papel tapiz con textura o mural artístico',
+      'Grifería en bronce o oro cepillado',
+      'Espejo vintage con marco dramático',
+      'Flores frescas o ramo seco de eucalipto permanente'
+    ],
+    iluminacion: 'Aplique artístico a lado de espejo + luz cenital dimmer',
+    acabados: 'Muros con papel o pintura efecto, piso porcelánico contraste'
+  },
+  'VESTIER': {
+    concept: 'Boutique personal — organización elegante con detalles de lujo',
+    paleta: ['#F5F0E8','#8B7355','#3A2F24','#D4AF7A'],
+    paletaNames:['Lino','Nogal','Café oscuro','Latón'],
+    elementos: [
+      'Closet modular tipo boutique con iluminación LED interior',
+      'Isla central con cajones para accesorios (si espacio permite)',
+      'Zona de sentado: puff tapizado o banco tapizado',
+      'Espejo de cuerpo entero con iluminación perimetral',
+      'Perchas uniformes en madera, organización por color'
+    ],
+    iluminacion: 'LED de tira cálida en estantes + luz central decorativa',
+    acabados: 'Piso madera o alfombra, muros en tono neutro suave'
+  },
+  'ESTUDIO MÚSICA': {
+    concept: 'Cápsula acústica — espacio íntimo para creatividad sonora',
+    paleta: ['#2D2825','#8B6F47','#C4A574','#F4EEE0'],
+    paletaNames:['Carbón','Nogal','Miel','Crema'],
+    elementos: [
+      'Paneles acústicos diseño artístico en muros (madera perforada)',
+      'Alfombra gruesa para absorción acústica',
+      'Sofá o butaca cómoda en cuero o terciopelo',
+      'Estantería flotante para instrumentos y vinilos',
+      'Mesa pequeña para partituras / notebook'
+    ],
+    iluminacion: 'Dimmer en toda la habitación + lámpara direccional piano/instrumento',
+    acabados: 'Muros con acústicos, piso madera con alfombra, cielo raso acústico'
+  },
+  'ESTUDIO TV': {
+    concept: 'Sala multimedia acogedora — cine en casa con comodidad máxima',
+    paleta: ['#2A3028','#8B6F47','#D4B896','#6B7A5C'],
+    paletaNames:['Verde oscuro','Nogal','Arena','Oliva'],
+    elementos: [
+      'Sofá modular en L tapizado en bouclé o terciopelo',
+      'Mueble TV flotante en madera con cableado oculto',
+      'Pantalla 75"+ o proyector con pantalla enrollable',
+      'Mesa centro redonda en madera maciza',
+      'Estantería integrada con libros y objetos personales',
+      'Alfombra de lana grande definiendo zona de sofá'
+    ],
+    iluminacion: 'Dimmer general + apliques traseros de TV (bias) + lámparas de lectura',
+    acabados: 'Piso madera, muro TV en material oscuro (madera o micro-cemento)'
+  },
+  'SALÓN': {
+    concept: 'Ambiente social elevado — espacio de encuentro con aire contemporáneo',
+    paleta: ['#FAF6ED','#C9A87F','#3D5A4C','#2D2925'],
+    paletaNames:['Crema','Miel dorada','Verde salvia','Carbón'],
+    elementos: [
+      'Sofás en L o dos sofás enfrentados en bouclé o lino pesado crema',
+      'Butacas de acento en terciopelo verde salvia o mostaza',
+      'Mesa centro esculpida en travertino, mármol o madera maciza',
+      'Alfombra grande definiendo zona (4×3m mínimo)',
+      'Chimenea o elemento focal (mural, arte, librero)',
+      'Obras de arte grandes de estatura sobre consola'
+    ],
+    iluminacion: 'Lámpara suspendida dramática + pie de lámpara + apliques acento',
+    acabados: 'Piso madera noble, muro TV o focal en micro-cemento o piedra'
+  },
+  'COMEDOR': {
+    concept: 'Celebración del encuentro — mesa para hacer memorias',
+    paleta: ['#F4EEE0','#8B6F47','#D4AF7A','#2A2622'],
+    paletaNames:['Marfil','Nogal','Latón','Grafito'],
+    elementos: [
+      'Mesa rectangular o ovalada para 8-10 personas, madera maciza',
+      'Sillas tapizadas en bouclé o cuero natural (mezcla permitida)',
+      'Lámpara colgante statement sobre mesa (40cm sobre superficie)',
+      'Aparador/bufete en madera para servicio',
+      'Centro de mesa: bandeja con vela o ramo fresco permanente',
+      'Obra de arte abstracta como fondo'
+    ],
+    iluminacion: 'Lámpara dramática central dimmer + velas para ambiente íntimo',
+    acabados: 'Piso continuo con salón, muro acento con arte destacado'
+  },
+  'COCINA': {
+    concept: 'Cocina profesional abierta — funcional y escultórica',
+    paleta: ['#1E2623','#D4B896','#C0C0C0','#8B7355'],
+    paletaNames:['Verde profundo','Arena','Acero','Nogal'],
+    elementos: [
+      'Isla central con cubierta piedra natural (cuarcita o mármol)',
+      'Gabinetes bajos en verde profundo o madera natural',
+      'Gabinetes altos mínimos — estantería abierta de madera',
+      'Grifería monomando acero o latón antiguo',
+      'Electrodomésticos panelados ocultos + acero profesional visible',
+      'Taburetes altos en cuero o madera en isla',
+      'Extractor escultórico como elemento de diseño'
+    ],
+    iluminacion: 'Colgantes statement sobre isla + LED bajo gabinete + plafón general',
+    acabados: 'Piso porcelánico o madera, backsplash piedra continua hasta techo'
+  },
+  'TERRAZA': {
+    concept: 'Oasis outdoor — extensión del salón al aire libre',
+    paleta: ['#6B5A3E','#8B9A6B','#D4B896','#F4EEE0'],
+    paletaNames:['Teca','Verde hoja','Arena','Crema'],
+    elementos: [
+      'Deck en madera IPE o teca (alta resistencia)',
+      'Sofás modulares outdoor tapicería Sunbrella crema',
+      'Mesa centro de teca o piedra lava',
+      'Sombrilla statement o pérgola con tela enrollable',
+      'Plantas en maceteros grandes: palmeras, monstera, suculentas',
+      'Iluminación indirecta: apliques muro + velas + guirnalda LED'
+    ],
+    iluminacion: 'Apliques LED murales + velas protegidas + luz bajo deck indirecta',
+    acabados: 'Deck madera tropical, muros exterior micro-cemento o piedra'
+  },
+  'MIRADOR': {
+    concept: 'Punto de contemplación — espacio aéreo para atardeceres',
+    paleta: ['#C9A87F','#8B7355','#2D4A3E','#F4EEE0'],
+    paletaNames:['Miel','Nogal','Verde bosque','Crema'],
+    elementos: [
+      'Tumbonas o hamaca colgante estructural',
+      'Mesa auxiliar baja para bebidas',
+      'Jardineras perimetrales con plantas colgantes',
+      'Alfombra outdoor tejida resistente UV',
+      'Iluminación guirnalda o apliques solares'
+    ],
+    iluminacion: 'LED solar perimetral + apliques cálidos + velas',
+    acabados: 'Piso deck continuo con terraza inferior'
+  },
+  'GARAJE': {
+    concept: 'Garaje contemporáneo — funcional con estética showroom',
+    paleta: ['#2A2A28','#E8E6E0','#C9A574','#5A5A55'],
+    paletaNames:['Grafito','Hueso','Miel','Gris medio'],
+    elementos: [
+      'Piso epóxico gris claro con líneas guía',
+      'Gabinetes murales modulares cerrados para almacenamiento',
+      'Banco de trabajo con superficie inoxidable',
+      'Iluminación LED industrial',
+      'Organizador vertical para bicicletas y equipo deportivo'
+    ],
+    iluminacion: 'LED lineales industriales + luz sobre banco trabajo',
+    acabados: 'Piso epóxico, muros pintura esmalte lavable'
+  },
+  'HALL': {
+    concept: 'Primera impresión — bienvenida que define el estilo',
+    paleta: ['#F4EEE0','#8B6F47','#D4AF7A','#2A2622'],
+    paletaNames:['Crema','Nogal','Latón','Grafito'],
+    elementos: [
+      'Consola estrecha de madera o piedra con espejo sobre',
+      'Lámpara colgante dramática como bienvenida',
+      'Obra de arte statement en muro principal',
+      'Florero con rama arquitectónica',
+      'Bandeja para llaves + contenedor decorativo'
+    ],
+    iluminacion: 'Colgante dramática + apliques bajos direccionales',
+    acabados: 'Piso continuo con zonas sociales, muro acento pintura especial'
+  },
+  'ESCALERA': {
+    concept: 'Ascenso escultórico — escalera como elemento arquitectónico',
+    paleta: ['#8B6F47','#2A2622','#F4EEE0','#C9A574'],
+    paletaNames:['Nogal','Grafito','Marfil','Latón'],
+    elementos: [
+      'Escalones en madera maciza con tabicas claras',
+      'Pasamanos de hierro forjado o cable tensado inoxidable',
+      'Iluminación LED en cada paso (bajo huella)',
+      'Muro de escalera con arte o elementos decorativos escalonados'
+    ],
+    iluminacion: 'LED bajo cada paso + apliques descendentes',
+    acabados: 'Madera pulida, pasamanos contraste metálico'
+  },
+  'VEST.1': {
+    concept: 'Vestier boutique compacto — orden y elegancia',
+    paleta: ['#F5F0E8','#8B7355','#3A2F24'],
+    paletaNames:['Lino','Nogal','Café oscuro'],
+    elementos: [
+      'Modulares con frentes en madera o melamina mate',
+      'LED interior en estantes',
+      'Espejo de puerta'
+    ],
+    iluminacion: 'LED interior + luz central',
+    acabados: 'Piso madera continuo'
+  },
+  'VEST.2': {
+    concept: 'Vestier boutique — más amplio, zona de organización',
+    paleta: ['#F5F0E8','#8B7355','#3A2F24','#D4AF7A'],
+    paletaNames:['Lino','Nogal','Café','Latón'],
+    elementos: [
+      'Closet modular completo piso a techo',
+      'Isla o banca central',
+      'Espejo con iluminación perimetral',
+      'Cajonera con separadores para accesorios'
+    ],
+    iluminacion: 'LED en estantes + luz cenital + espejo iluminado',
+    acabados: 'Piso madera, muros tono neutro'
+  }
+};
+
+function renderDeco(){
+  const container = document.getElementById('decoList');
+  if(!container) return;
+  
+  // Get unique rooms by name (to avoid duplicates like BAÑO appearing multiple times)
+  const shown = new Set();
+  const roomsToShow = rooms.filter(r => {
+    if(r.cat === 'Servicio' || r.cat === 'Exterior' || r.cat === 'Circulación') return false;
+    if(!decoData[r.name]) return false;
+    if(shown.has(r.name)) return false;
+    shown.add(r.name);
+    return true;
+  });
+  
+  container.innerHTML = roomsToShow.map(r => {
+    const d = decoData[r.name];
+    if(!d) return '';
+    const paletteHtml = d.paleta.map((c,i) => `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div style="width:44px;height:44px;border-radius:8px;background:${c};border:1px solid rgba(255,255,255,0.1);box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>
+        <div style="font-size:9px;color:var(--muted);text-align:center;">${d.paletaNames[i]}</div>
+      </div>
+    `).join('');
+    
+    return `
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <div style="width:14px;height:14px;border-radius:2px;background:${r.fill};border:1px solid rgba(0,0,0,0.2);"></div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--paper);">${r.name}</div>
+        </div>
+        <div style="font-size:11px;color:var(--accent);font-style:italic;margin-bottom:14px;line-height:1.5;">${d.concept}</div>
+        
+        <div style="font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Paleta cromática</div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">${paletteHtml}</div>
+        
+        <div style="font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Elementos clave</div>
+        <ul style="list-style:none;padding:0;margin-bottom:14px;">
+          ${d.elementos.map(e => `<li style="font-size:11px;line-height:1.6;color:var(--paper);padding-left:14px;position:relative;margin-bottom:4px;">
+            <span style="position:absolute;left:0;color:var(--accent);">▸</span>${e}
+          </li>`).join('')}
+        </ul>
+        
+        <div style="display:grid;grid-template-columns:1fr;gap:10px;">
+          <div style="background:rgba(122,175,110,0.08);border-left:3px solid var(--accent);padding:10px 12px;border-radius:0 4px 4px 0;">
+            <div style="font-size:9px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;">💡 Iluminación</div>
+            <div style="font-size:11px;line-height:1.5;color:var(--paper);">${d.iluminacion}</div>
+          </div>
+          <div style="background:rgba(201,168,76,0.08);border-left:3px solid var(--gold);padding:10px 12px;border-radius:0 4px 4px 0;">
+            <div style="font-size:9px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;">✨ Acabados</div>
+            <div style="font-size:11px;line-height:1.5;color:var(--paper);">${d.acabados}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// DRAG HANDLES & COTAS PROFESIONALES
+// ═══════════════════════════════════════════════
+
+function getSVGCoords(e){
+  const rect = svg.getBoundingClientRect();
+  const vb = svg.viewBox.baseVal;
+  return {
+    x: (e.clientX - rect.left) * (vb.width  / rect.width),
+    y: (e.clientY - rect.top)  * (vb.height / rect.height)
+  };
+}
+
+function svgToScreen(svgX, svgY){
+  const rect = svg.getBoundingClientRect();
+  const vb = svg.viewBox.baseVal;
+  return {
+    x: rect.left + (svgX / vb.width)  * rect.width,
+    y: rect.top  + (svgY / vb.height) * rect.height
+  };
+}
+
+function snapHalf(v){ return Math.round(v * 2) / 2; }
+
+// ── Cotas profesionales ──────────────────────────
+function drawCotas(r){
+  if(!r || r.lshape) return;
+  const x1 = SX(r.c1), x2 = SX(r.c2);
+  const y1 = SY(r.f1), y2 = SY(r.f2);
+  const wm = +(r.c2 - r.c1).toFixed(1);
+  const hm = +(r.f2 - r.f1).toFixed(1);
+  const off  = Math.max(11, U * 0.7);
+  const tick = 4.5;
+  const lc   = '#3D7A35';
+  const lw   = 0.8;
+  const fs   = Math.max(7.5, Math.min(10.5, U * 0.58));
+
+  // ── Cota ancho (arriba) ──
+  const cy = y1 - off;
+  addL(x1, y1 - 1, x1, cy + tick, lc, lw);
+  addL(x2, y1 - 1, x2, cy + tick, lc, lw);
+  addL(x1, cy, x2, cy, lc, lw);
+  addL(x1, cy - tick, x1, cy + tick, lc, lw * 1.6);
+  addL(x2, cy - tick, x2, cy + tick, lc, lw * 1.6);
+  addCotaLabel((x1+x2)/2, cy - 2, `${wm} m`, fs, null, () => {
+    openCotaInput((x1+x2)/2, cy - 2, wm, v => {
+      const newC2 = snapHalf(r.c1 + v);
+      if(newC2 > r.c1 + 0.5 && newC2 <= COLS){
+        r.c2 = newC2;
+        document.getElementById('fC2').value = r.c2;
+        document.getElementById('areaDisplay').textContent = `${((r.c2-r.c1)*(r.f2-r.f1)).toFixed(2)} m²`;
+        view3dDirty = true; draw();
+      }
+    });
+  });
+
+  // ── Cota alto (izquierda) ──
+  const cx = x1 - off;
+  addL(x1 - 1, y1, cx + tick, y1, lc, lw);
+  addL(x1 - 1, y2, cx + tick, y2, lc, lw);
+  addL(cx, y1, cx, y2, lc, lw);
+  addL(cx - tick, y1, cx + tick, y1, lc, lw * 1.6);
+  addL(cx - tick, y2, cx + tick, y2, lc, lw * 1.6);
+  addCotaLabel(cx, (y1+y2)/2, `${hm} m`, fs, -90, () => {
+    openCotaInput(cx, (y1+y2)/2, hm, v => {
+      const newF2 = snapHalf(r.f1 + v);
+      if(newF2 > r.f1 + 0.5 && newF2 <= FILAS){
+        r.f2 = newF2;
+        document.getElementById('fF2').value = r.f2;
+        document.getElementById('areaDisplay').textContent = `${((r.c2-r.c1)*(r.f2-r.f1)).toFixed(2)} m²`;
+        view3dDirty = true; draw();
+      }
+    });
+  });
+}
+
+function addCotaLabel(cx, cy, text, fs, rotate, onClick){
+  const g = ns('g');
+  g.setAttribute('cursor', 'pointer');
+  if(rotate) g.setAttribute('transform', `rotate(${rotate},${cx},${cy})`);
+
+  const tw = text.length * fs * 0.63 + 10;
+  const th = fs + 7;
+  const bg = ns('rect');
+  bg.setAttribute('x', cx - tw/2); bg.setAttribute('y', cy - th/2);
+  bg.setAttribute('width', tw);    bg.setAttribute('height', th);
+  bg.setAttribute('rx', '3');
+  bg.setAttribute('fill', '#192A1C');
+  bg.setAttribute('stroke', '#3D7A35');
+  bg.setAttribute('stroke-width', '0.7');
+  g.appendChild(bg);
+
+  const t = ns('text');
+  t.setAttribute('x', cx); t.setAttribute('y', cy);
+  t.setAttribute('font-size', fs); t.setAttribute('font-weight', '600');
+  t.setAttribute('fill', '#7AAF6E');
+  t.setAttribute('text-anchor', 'middle'); t.setAttribute('dominant-baseline', 'central');
+  t.setAttribute('font-family', 'DM Sans,sans-serif');
+  t.textContent = text;
+  g.appendChild(t);
+
+  g.addEventListener('click',    e => { e.stopPropagation(); onClick(); });
+  g.addEventListener('touchend', e => { e.stopPropagation(); e.preventDefault(); onClick(); });
+  svg.appendChild(g);
+}
+
+function openCotaInput(svgX, svgY, currentValue, onCommit){
+  document.querySelectorAll('.dim-input-overlay').forEach(el => el.remove());
+  const sc  = svgToScreen(svgX, svgY);
+  const inp = document.createElement('input');
+  inp.type  = 'number'; inp.step = '0.5'; inp.min = '0.5';
+  inp.value = currentValue;
+  inp.className = 'dim-input-overlay';
+  inp.style.left = `${sc.x - 42}px`;
+  inp.style.top  = `${sc.y - 18}px`;
+  document.body.appendChild(inp);
+  inp.focus(); inp.select();
+
+  function commit(){
+    const v = parseFloat(inp.value);
+    inp.remove();
+    if(!isNaN(v) && v >= 0.5) onCommit(v);
+  }
+  inp.addEventListener('keydown', e => {
+    if(e.key === 'Enter')  commit();
+    if(e.key === 'Escape') inp.remove();
+  });
+  inp.addEventListener('blur', () => setTimeout(() => { if(document.contains(inp)) inp.remove(); }, 150));
+}
+
+// ── Handles de redimensión ───────────────────────
+function drawHandles(r){
+  if(!r || r.lshape) return;
+  const hData = [
+    {type:'N',  hx:(SX(r.c1)+SX(r.c2))/2, hy:SY(r.f1)},
+    {type:'S',  hx:(SX(r.c1)+SX(r.c2))/2, hy:SY(r.f2)},
+    {type:'W',  hx:SX(r.c1), hy:(SY(r.f1)+SY(r.f2))/2},
+    {type:'E',  hx:SX(r.c2), hy:(SY(r.f1)+SY(r.f2))/2},
+    {type:'NW', hx:SX(r.c1), hy:SY(r.f1)},
+    {type:'NE', hx:SX(r.c2), hy:SY(r.f1)},
+    {type:'SW', hx:SX(r.c1), hy:SY(r.f2)},
+    {type:'SE', hx:SX(r.c2), hy:SY(r.f2)},
+  ];
+  const cursors = {N:'n-resize',S:'s-resize',W:'w-resize',E:'e-resize',
+                   NW:'nw-resize',NE:'ne-resize',SW:'sw-resize',SE:'se-resize'};
+  const hs  = Math.max(5, U * 0.32);
+  const hit = Math.max(20, hs * 2.8);
+
+  hData.forEach(h => {
+    // Hit area grande (invisible)
+    const hitEl = ns('rect');
+    hitEl.setAttribute('x', h.hx - hit/2); hitEl.setAttribute('y', h.hy - hit/2);
+    hitEl.setAttribute('width', hit);       hitEl.setAttribute('height', hit);
+    hitEl.setAttribute('fill', 'transparent');
+    hitEl.style.cursor = cursors[h.type];
+    svg.appendChild(hitEl);
+
+    // Visual (esquinas = cuadrado, bordes = círculo)
+    const isCorner = h.type.length === 2;
+    const vis = isCorner ? ns('rect') : ns('circle');
+    if(isCorner){
+      vis.setAttribute('x', h.hx - hs/2); vis.setAttribute('y', h.hy - hs/2);
+      vis.setAttribute('width', hs);       vis.setAttribute('height', hs);
+      vis.setAttribute('rx', '2');
+    } else {
+      vis.setAttribute('cx', h.hx); vis.setAttribute('cy', h.hy);
+      vis.setAttribute('r', hs/2);
+    }
+    vis.setAttribute('fill', '#7AAF6E');
+    vis.setAttribute('stroke', '#fff');
+    vis.setAttribute('stroke-width', '1.5');
+    vis.style.pointerEvents = 'none';
+    svg.appendChild(vis);
+
+    function startDrag(e){
+      e.stopPropagation();
+      const coords = (e.touches ? getSVGCoords(e.touches[0]) : getSVGCoords(e));
+      dragHandle = { type:h.type, room:r,
+        startX:coords.x, startY:coords.y,
+        origC1:r.c1, origC2:r.c2, origF1:r.f1, origF2:r.f2 };
+    }
+    hitEl.addEventListener('mousedown', startDrag);
+    hitEl.addEventListener('touchstart', e => { e.preventDefault(); startDrag(e); }, {passive:false});
+  });
+}
+
+function onSVGDrag(e){
+  if(!dragHandle) return;
+  didDrag = true;
+  const pt  = e.touches ? getSVGCoords(e.touches[0]) : getSVGCoords(e);
+  const dc  = (pt.x - dragHandle.startX) / U;
+  const df  = (pt.y - dragHandle.startY) / U;
+  const r   = dragHandle.room;
+  const t   = dragHandle.type;
+  const MIN = 1;
+
+  if(['W','NW','SW'].includes(t))
+    r.c1 = Math.max(0,    Math.min(snapHalf(dragHandle.origC1 + dc), dragHandle.origC2 - MIN));
+  if(['E','NE','SE'].includes(t))
+    r.c2 = Math.min(COLS, Math.max(snapHalf(dragHandle.origC2 + dc), dragHandle.origC1 + MIN));
+  if(['N','NW','NE'].includes(t))
+    r.f1 = Math.max(0,    Math.min(snapHalf(dragHandle.origF1 + df), dragHandle.origF2 - MIN));
+  if(['S','SW','SE'].includes(t))
+    r.f2 = Math.min(FILAS,Math.max(snapHalf(dragHandle.origF2 + df), dragHandle.origF1 + MIN));
+
+  // Actualiza panel en tiempo real
+  document.getElementById('fC1').value = r.c1;
+  document.getElementById('fC2').value = r.c2;
+  document.getElementById('fF1').value = r.f1;
+  document.getElementById('fF2').value = r.f2;
+  document.getElementById('areaDisplay').textContent = `${((r.c2-r.c1)*(r.f2-r.f1)).toFixed(2)} m²`;
+  draw();
+}
+
+function endSVGDrag(){
+  if(!dragHandle) return;
+  view3dDirty = true;
+  dragHandle = null;
+  draw();
+  setTimeout(() => { didDrag = false; }, 60);
+}
+
+// Listeners SVG (se adjuntan una sola vez, persisten entre redraws)
+svg.addEventListener('mousemove', onSVGDrag);
+svg.addEventListener('mouseup',   endSVGDrag);
+svg.addEventListener('mouseleave',endSVGDrag);
+svg.addEventListener('touchmove', e => { if(dragHandle){ e.preventDefault(); onSVGDrag(e); } }, {passive:false});
+svg.addEventListener('touchend',  e => { if(dragHandle){ e.preventDefault(); endSVGDrag(); } }, {passive:false});
+
+// ═══════════════════════════════════════════════
+// BOTTOM SHEET (móvil)
+// ═══════════════════════════════════════════════
+(function(){
+  const pill  = document.getElementById('sheetPill');
+  const panel = document.getElementById('rightPanel');
+  let t0 = null;
+
+  pill.addEventListener('touchstart', e => {
+    t0 = e.touches[0].clientY;
+  }, {passive:true});
+  pill.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
+  pill.addEventListener('touchend', e => {
+    if(t0 === null) return;
+    const dy = t0 - e.changedTouches[0].clientY;
+    if(dy > 40)       panel.classList.add('bs-expanded');
+    else if(dy < -40){
+      if(panel.classList.contains('bs-expanded')) panel.classList.remove('bs-expanded');
+      else closePanel();
+    }
+    t0 = null;
+  });
+})();
+
+draw();
+document.getElementById('gridBtn').classList.add('active');
+document.getElementById('labelBtn').classList.add('active');
+window.addEventListener('resize', () => {
+  if(currentTab === 'plan') draw();
+  if(currentTab === '3d') view3d.resize();
+});
+</script>
+</body>
+</html>
