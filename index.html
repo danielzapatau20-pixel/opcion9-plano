@@ -176,6 +176,7 @@ svg{display:block;}
     <div class="project-meta">Terreno 32×34 m · 337 m² · 3 Alcobas</div>
   </div>
   <div class="topbar-right">
+    <button class="icon-btn" id="groupBtn" onclick="toggleMultiMode()" title="Seleccionar suite (mover varios cuartos juntos)">⊹</button>
     <button class="icon-btn" id="gridBtn" onclick="toggleGrid()" title="Cuadrícula">⊞</button>
     <button class="icon-btn" id="labelBtn" onclick="toggleLabels()" title="Etiquetas">T</button>
     <button class="btn btn-ghost btn-sm" onclick="window.print()">↗ PDF</button>
@@ -200,6 +201,13 @@ svg{display:block;}
       <button class="icon-btn" onclick="zoom(1.2)">+</button>
       <button class="icon-btn" onclick="zoom(0.83)">−</button>
       <button class="icon-btn" onclick="resetZoom()">⊙</button>
+    </div>
+    <!-- Barra flotante de grupo -->
+    <div id="groupBar" style="display:none;position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(20,36,20,0.96);border:1px solid var(--accent);border-radius:20px;padding:8px 16px;align-items:center;gap:10px;z-index:20;white-space:nowrap;backdrop-filter:blur(8px);box-shadow:0 4px 20px rgba(0,0,0,0.5);">
+      <span style="font-size:10px;color:var(--muted);letter-spacing:0.5px;">GRUPO</span>
+      <span id="groupCount" style="font-size:13px;font-weight:600;color:var(--accent);">0</span>
+      <span style="font-size:10px;color:var(--muted);">cuartos · arrastra ✥ para mover juntos</span>
+      <button onclick="clearGroup()" style="background:none;border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:var(--muted);font-size:11px;padding:2px 8px;cursor:pointer;">✕</button>
     </div>
   </div>
 
@@ -429,6 +437,9 @@ let nextId = 40;
 let view3dDirty = false;
 let dragHandle = null;   // estado del drag de handles
 let didDrag = false;     // previene click-select tras un drag
+let moveRoom  = null;    // drag para mover cuarto completo
+let groupIds  = new Set(); // IDs seleccionados para mover en grupo
+let multiMode = false;   // modo selección múltiple activo
 
 const svg = document.getElementById('svg');
 const ns = t => document.createElementNS('http://www.w3.org/2000/svg', t);
@@ -504,11 +515,25 @@ function draw(){
 
   addT(SX(COLS/2), MT + FILAS*U + MB*0.6, '32 m', fs, '400', '#3A6035');
 
-  // Cotas profesionales + handles de redimensión en cuarto seleccionado
+  // Cotas + resize handles en cuarto seleccionado
   if(selectedId){
     const sr = rooms.find(x => x.id === selectedId);
     if(sr && !sr.lshape){ drawCotas(sr); drawHandles(sr); }
   }
+  // Highlights + move handles del grupo
+  if(groupIds.size > 0) drawGroupHighlights();
+  // Move handle (✥) en cuarto seleccionado (si no está en modo grupo)
+  if(selectedId && !multiMode){
+    const sr = rooms.find(x => x.id === selectedId);
+    if(sr && !sr.lshape) drawMoveHandle(sr, false);
+  }
+  // Move handles en cada cuarto del grupo
+  if(multiMode) groupIds.forEach(id => {
+    const gr = rooms.find(x => x.id === id);
+    if(gr && !gr.lshape) drawMoveHandle(gr, true);
+  });
+  // Brújula y barra de escala
+  drawCompass();
 }
 
 function drawRoom(r){
@@ -678,6 +703,14 @@ function addT(x,y,t,size,weight,fill,anchor){
 }
 
 function selectRoom(id){
+  // Modo grupo: toggle sin abrir panel
+  if(multiMode){
+    if(groupIds.has(id)) groupIds.delete(id);
+    else groupIds.add(id);
+    updateGroupBar();
+    draw();
+    return;
+  }
   selectedId = id;
   const r = rooms.find(x => x.id === id);
   if(!r) return;
@@ -2539,47 +2572,226 @@ function drawHandles(r){
 }
 
 function onSVGDrag(e){
-  if(!dragHandle) return;
-  didDrag = true;
-  const pt  = e.touches ? getSVGCoords(e.touches[0]) : getSVGCoords(e);
-  const dc  = (pt.x - dragHandle.startX) / U;
-  const df  = (pt.y - dragHandle.startY) / U;
-  const r   = dragHandle.room;
-  const t   = dragHandle.type;
-  const MIN = 1;
-
-  if(['W','NW','SW'].includes(t))
-    r.c1 = Math.max(0,    Math.min(snapHalf(dragHandle.origC1 + dc), dragHandle.origC2 - MIN));
-  if(['E','NE','SE'].includes(t))
-    r.c2 = Math.min(COLS, Math.max(snapHalf(dragHandle.origC2 + dc), dragHandle.origC1 + MIN));
-  if(['N','NW','NE'].includes(t))
-    r.f1 = Math.max(0,    Math.min(snapHalf(dragHandle.origF1 + df), dragHandle.origF2 - MIN));
-  if(['S','SW','SE'].includes(t))
-    r.f2 = Math.min(FILAS,Math.max(snapHalf(dragHandle.origF2 + df), dragHandle.origF1 + MIN));
-
-  // Actualiza panel en tiempo real
-  document.getElementById('fC1').value = r.c1;
-  document.getElementById('fC2').value = r.c2;
-  document.getElementById('fF1').value = r.f1;
-  document.getElementById('fF2').value = r.f2;
-  document.getElementById('areaDisplay').textContent = `${((r.c2-r.c1)*(r.f2-r.f1)).toFixed(2)} m²`;
-  draw();
+  // ── Resize handle ──
+  if(dragHandle){
+    didDrag = true;
+    const pt  = e.touches ? getSVGCoords(e.touches[0]) : getSVGCoords(e);
+    const dc  = (pt.x - dragHandle.startX) / U;
+    const df  = (pt.y - dragHandle.startY) / U;
+    const r   = dragHandle.room;
+    const t   = dragHandle.type;
+    const MIN = 1;
+    if(['W','NW','SW'].includes(t))
+      r.c1 = Math.max(0,    Math.min(snapHalf(dragHandle.origC1 + dc), dragHandle.origC2 - MIN));
+    if(['E','NE','SE'].includes(t))
+      r.c2 = Math.min(COLS, Math.max(snapHalf(dragHandle.origC2 + dc), dragHandle.origC1 + MIN));
+    if(['N','NW','NE'].includes(t))
+      r.f1 = Math.max(0,    Math.min(snapHalf(dragHandle.origF1 + df), dragHandle.origF2 - MIN));
+    if(['S','SW','SE'].includes(t))
+      r.f2 = Math.min(FILAS,Math.max(snapHalf(dragHandle.origF2 + df), dragHandle.origF1 + MIN));
+    document.getElementById('fC1').value = r.c1;
+    document.getElementById('fC2').value = r.c2;
+    document.getElementById('fF1').value = r.f1;
+    document.getElementById('fF2').value = r.f2;
+    document.getElementById('areaDisplay').textContent = `${((r.c2-r.c1)*(r.f2-r.f1)).toFixed(2)} m²`;
+    draw(); return;
+  }
+  // ── Move room ──
+  if(moveRoom){
+    didDrag = true;
+    const pt  = e.touches ? getSVGCoords(e.touches[0]) : getSVGCoords(e);
+    const sdc = snapHalf((pt.x - moveRoom.startX) / U);
+    const sdf = snapHalf((pt.y - moveRoom.startY) / U);
+    moveRoom.rooms.forEach(({room:r, origC1, origC2, origF1, origF2}) => {
+      const w = origC2 - origC1, h = origF2 - origF1;
+      r.c1 = Math.max(0, Math.min(origC1 + sdc, COLS - w)); r.c2 = r.c1 + w;
+      r.f1 = Math.max(0, Math.min(origF1 + sdf, FILAS - h)); r.f2 = r.f1 + h;
+    });
+    const pr = moveRoom.rooms[0]?.room;
+    if(pr){
+      document.getElementById('fC1').value = pr.c1; document.getElementById('fC2').value = pr.c2;
+      document.getElementById('fF1').value = pr.f1; document.getElementById('fF2').value = pr.f2;
+    }
+    draw();
+  }
 }
 
 function endSVGDrag(){
-  if(!dragHandle) return;
-  view3dDirty = true;
-  dragHandle = null;
-  draw();
-  setTimeout(() => { didDrag = false; }, 60);
+  if(dragHandle){ view3dDirty = true; dragHandle = null; draw(); setTimeout(() => { didDrag = false; }, 60); return; }
+  if(moveRoom)  { view3dDirty = true; moveRoom   = null; draw(); setTimeout(() => { didDrag = false; }, 60); }
 }
 
-// Listeners SVG (se adjuntan una sola vez, persisten entre redraws)
+// Listeners SVG (persisten entre redraws)
 svg.addEventListener('mousemove', onSVGDrag);
 svg.addEventListener('mouseup',   endSVGDrag);
 svg.addEventListener('mouseleave',endSVGDrag);
-svg.addEventListener('touchmove', e => { if(dragHandle){ e.preventDefault(); onSVGDrag(e); } }, {passive:false});
-svg.addEventListener('touchend',  e => { if(dragHandle){ e.preventDefault(); endSVGDrag(); } }, {passive:false});
+svg.addEventListener('touchmove', e => { if(dragHandle||moveRoom){ e.preventDefault(); onSVGDrag(e); } }, {passive:false});
+svg.addEventListener('touchend',  e => { if(dragHandle||moveRoom){ e.preventDefault(); endSVGDrag(); } }, {passive:false});
+
+// ═══════════════════════════════════════════════
+// MOVER CUARTOS — handle central ✥
+// ═══════════════════════════════════════════════
+
+function drawMoveHandle(r, isGroup){
+  if(!r) return;
+  const cx = (SX(r.c1) + SX(r.c2)) / 2;
+  const cy = (SY(r.f1) + SY(r.f2)) / 2;
+  const hs = Math.max(9, Math.min(15, U * 0.5));
+
+  const bg = ns('circle');
+  bg.setAttribute('cx', cx); bg.setAttribute('cy', cy); bg.setAttribute('r', hs);
+  bg.setAttribute('fill', isGroup ? 'rgba(201,168,76,0.88)' : 'rgba(20,40,20,0.88)');
+  bg.setAttribute('stroke', isGroup ? '#C9A84C' : '#7AAF6E');
+  bg.setAttribute('stroke-width', '1.5');
+  bg.style.cursor = 'move';
+  svg.appendChild(bg);
+
+  const icon = ns('text');
+  icon.setAttribute('x', cx); icon.setAttribute('y', cy);
+  icon.setAttribute('font-size', hs); icon.setAttribute('text-anchor', 'middle');
+  icon.setAttribute('dominant-baseline', 'central');
+  icon.setAttribute('fill', isGroup ? '#1C1C1A' : '#7AAF6E');
+  icon.setAttribute('font-family', 'sans-serif');
+  icon.textContent = '✥';
+  icon.style.pointerEvents = 'none';
+  svg.appendChild(icon);
+
+  function onMoveStart(e){
+    e.stopPropagation();
+    const coords = e.touches ? getSVGCoords(e.touches[0]) : getSVGCoords(e);
+    const toMove = [];
+    const addR = id => {
+      const rm = rooms.find(x => x.id === id);
+      if(rm) toMove.push({room:rm, origC1:rm.c1, origC2:rm.c2, origF1:rm.f1, origF2:rm.f2});
+    };
+    addR(r.id);
+    // Si es parte del grupo, mover todo el grupo
+    if(groupIds.has(r.id)) groupIds.forEach(id => { if(id !== r.id) addR(id); });
+    moveRoom = { startX:coords.x, startY:coords.y, rooms:toMove };
+  }
+  bg.addEventListener('mousedown', onMoveStart);
+  bg.addEventListener('touchstart', e => { e.preventDefault(); onMoveStart(e); }, {passive:false});
+}
+
+// ═══════════════════════════════════════════════
+// MULTI-SELECCIÓN DE GRUPO
+// ═══════════════════════════════════════════════
+
+function toggleMultiMode(){
+  multiMode = !multiMode;
+  document.getElementById('groupBtn').classList.toggle('active', multiMode);
+  if(!multiMode){ groupIds.clear(); updateGroupBar(); }
+  draw();
+  toast(multiMode ? '⊹ Toca cuartos para agrupar' : 'Modo grupo desactivado');
+}
+
+function clearGroup(){
+  groupIds.clear();
+  updateGroupBar();
+  draw();
+}
+
+function updateGroupBar(){
+  const bar = document.getElementById('groupBar');
+  const cnt = groupIds.size;
+  bar.style.display = cnt > 0 ? 'flex' : 'none';
+  document.getElementById('groupCount').textContent = cnt;
+}
+
+function drawGroupHighlights(){
+  groupIds.forEach(id => {
+    const r = rooms.find(x => x.id === id);
+    if(!r || r.lshape) return;
+    const sh = ns('rect');
+    sh.setAttribute('x', SX(r.c1)-3); sh.setAttribute('y', SY(r.f1)-3);
+    sh.setAttribute('width', SW(r.c1,r.c2)+6); sh.setAttribute('height', SH(r.f1,r.f2)+6);
+    sh.setAttribute('fill', 'none');
+    sh.setAttribute('stroke', '#C9A84C');
+    sh.setAttribute('stroke-width', '2');
+    sh.setAttribute('stroke-dasharray', '5,2');
+    sh.setAttribute('rx', '2');
+    sh.style.pointerEvents = 'none';
+    svg.appendChild(sh);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// BRÚJULA Y BARRA DE ESCALA
+// ═══════════════════════════════════════════════
+
+function drawCompass(){
+  // Posición: esquina inferior derecha, fuera del terreno
+  const r  = Math.max(8, U * 0.55);
+  const cx = SX(COLS) - r - 6;
+  const cy = SY(FILAS) - r - 4;
+  const fs = Math.max(5.5, r * 0.5);
+
+  // Círculo de fondo
+  const bg = ns('circle');
+  bg.setAttribute('cx', cx); bg.setAttribute('cy', cy); bg.setAttribute('r', r + 3);
+  bg.setAttribute('fill', 'rgba(26,26,24,0.88)');
+  bg.setAttribute('stroke', 'rgba(74,122,62,0.5)'); bg.setAttribute('stroke-width', '0.8');
+  svg.appendChild(bg);
+
+  // Flechas N (verde) y S (gris)
+  const arrowN = ns('polygon');
+  arrowN.setAttribute('points', `${cx},${cy - r + 1} ${cx - r*0.28},${cy + r*0.1} ${cx + r*0.28},${cy + r*0.1}`);
+  arrowN.setAttribute('fill', '#7AAF6E');
+  svg.appendChild(arrowN);
+
+  const arrowS = ns('polygon');
+  arrowS.setAttribute('points', `${cx},${cy + r - 1} ${cx - r*0.28},${cy - r*0.1} ${cx + r*0.28},${cy - r*0.1}`);
+  arrowS.setAttribute('fill', '#4A4A46');
+  svg.appendChild(arrowS);
+
+  // Letra N
+  const nt = ns('text');
+  nt.setAttribute('x', cx); nt.setAttribute('y', cy - r - 4);
+  nt.setAttribute('font-size', fs); nt.setAttribute('font-weight', '700');
+  nt.setAttribute('fill', '#7AAF6E'); nt.setAttribute('text-anchor', 'middle');
+  nt.setAttribute('dominant-baseline', 'central'); nt.setAttribute('font-family', 'DM Sans,sans-serif');
+  nt.textContent = 'N';
+  svg.appendChild(nt);
+
+  // Barra de escala (5m) — a la izquierda de la brújula
+  const barLen = 5 * U;
+  const bx = cx - r - 8 - barLen;
+  const by = cy + r * 0.2;
+  addL(bx, by, bx + barLen, by, '#9A9890', 1.2);
+  addL(bx, by - 3, bx, by + 3, '#9A9890', 1);
+  addL(bx + barLen, by - 3, bx + barLen, by + 3, '#9A9890', 1);
+  addT(bx + barLen/2, by - 5, '5 m', Math.max(5.5, fs * 0.9), '400', '#9A9890');
+}
+
+// ═══════════════════════════════════════════════
+// PINCH-TO-ZOOM en el plano
+// ═══════════════════════════════════════════════
+(function(){
+  const planArea = document.getElementById('planView');
+  let pinch = null;
+
+  planArea.addEventListener('touchstart', e => {
+    if(e.touches.length === 2){
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinch = { dist: Math.hypot(dx, dy), zoom: zoomLevel };
+      e.preventDefault();
+    }
+  }, {passive:false});
+
+  planArea.addEventListener('touchmove', e => {
+    if(e.touches.length === 2 && pinch){
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      zoomLevel = Math.max(0.5, Math.min(3, pinch.zoom * (newDist / pinch.dist)));
+      draw();
+      e.preventDefault();
+    }
+  }, {passive:false});
+
+  planArea.addEventListener('touchend', () => { pinch = null; });
+})();
 
 // ═══════════════════════════════════════════════
 // BOTTOM SHEET (móvil)
