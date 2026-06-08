@@ -298,7 +298,10 @@ svg{display:block;}
   <div class="specs-view" id="specsView" style="display:none;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <div class="specs-title" style="margin:0">Especificaciones</div>
-      <button class="btn btn-ghost btn-sm" onclick="window.print()">↗ Exportar</button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-ghost btn-sm" onclick="window.print()">↗ Exportar</button>
+        <button class="btn btn-sm" style="background:rgba(192,57,43,0.12);color:#E74C3C;border:1px solid rgba(192,57,43,0.25);" onclick="resetState()">↺ Reiniciar</button>
+      </div>
     </div>
     <div class="stat-grid" id="statGrid"></div>
     <table class="specs-table" id="specsTable"></table>
@@ -513,7 +516,8 @@ function draw(){
   addL(SX(24), SY(8), SX(24), SY(29), limColor, limW);
   addL(SX(5), SY(8), SX(5), SY(29), limColor, limW);
 
-  addT(SX(COLS/2), MT + FILAS*U + MB*0.6, '32 m', fs, '400', '#3A6035');
+  // Cotas del lote completo
+  drawLoteCotas(fs);
 
   // Cotas + resize handles en cuarto seleccionado
   if(selectedId){
@@ -1102,7 +1106,7 @@ function applyEdit(){
     r.notchF1 = +document.getElementById('fNF1').value;
     r.notchF2 = +document.getElementById('fNF2').value;
   }
-  closePanel(); draw();
+  closePanel(); draw(); saveState();
   toast(`✓ ${r.name} actualizado`);
 }
 
@@ -1112,7 +1116,7 @@ function deleteRoom(){
   if(!confirm(`¿Eliminar "${r.name}"?`)) return;
   rooms = rooms.filter(x => x.id !== selectedId);
   selectedId = null; closePanel(); draw();
-  view3dDirty = true;
+  view3dDirty = true; saveState();
   toast('Eliminado');
 }
 
@@ -1122,7 +1126,7 @@ function duplicateRoom(){
   const nr = {...r, id:nextId++, name:r.name+' (2)', c1:r.c1+1, c2:r.c2+1};
   rooms.push(nr); closePanel(); draw();
   selectRoom(nr.id);
-  view3dDirty = true;
+  view3dDirty = true; saveState();
 }
 
 function closePanel(){
@@ -1136,7 +1140,7 @@ function addRoom(){
   if(!name) return;
   const nr = {id:nextId++, name:name.toUpperCase(), sub:'', cat:'Otro', c1:8, f1:8, c2:12, f2:10, fill:'#F5F2EC', notes:'', material:'', height:2.6};
   rooms.push(nr); draw(); selectRoom(nr.id);
-  view3dDirty = true;
+  view3dDirty = true; saveState();
 }
 
 function toggleGrid(){ showGrid = !showGrid; document.getElementById('gridBtn').classList.toggle('active', showGrid); draw(); }
@@ -1175,13 +1179,42 @@ function switchTab(tab){
 }
 
 function updateSpecs(){
-  const totalArea = rooms.reduce((s,r) => s + (r.cat !== 'Exterior' ? +area(r) : 0), 0);
-  const alcobas = rooms.filter(r => r.cat === 'Alcobas').length;
-  const banos = rooms.filter(r => r.cat === 'Baños').length;
+  const LOTE_W = 32, LOTE_H = 34;
+  const LOTE_AREA = LOTE_W * LOTE_H;                             // 1 088 m²
+  const areaConstr = rooms.reduce((s,r) => s + (r.cat !== 'Exterior' ? +area(r) : 0), 0);
+  const areaExt    = rooms.reduce((s,r) => s + (r.cat === 'Exterior' ? +area(r) : 0), 0);
+  const areaLibre  = +(LOTE_AREA - areaConstr - areaExt).toFixed(1);
+  const ocupacion  = ((areaConstr / LOTE_AREA) * 100).toFixed(1);
+  const alcobas    = rooms.filter(r => r.cat === 'Alcobas').length;
+  const banos      = rooms.filter(r => r.cat === 'Baños').length;
+
   document.getElementById('statGrid').innerHTML = `
-    <div class="stat-card"><div class="stat-val">${totalArea.toFixed(0)}</div><div class="stat-lbl">m² construidos</div></div>
-    <div class="stat-card"><div class="stat-val">${alcobas}</div><div class="stat-lbl">Alcobas</div></div>
-    <div class="stat-card"><div class="stat-val">${banos}</div><div class="stat-lbl">Baños</div></div>`;
+    <!-- Lote -->
+    <div class="stat-card" style="border-color:rgba(74,122,62,0.4)">
+      <div class="stat-val" style="font-size:16px">${LOTE_W}×${LOTE_H}</div>
+      <div class="stat-lbl">Frente × Fondo (m)</div>
+    </div>
+    <div class="stat-card" style="border-color:rgba(74,122,62,0.4)">
+      <div class="stat-val">${LOTE_AREA.toLocaleString()}</div>
+      <div class="stat-lbl">m² lote total</div>
+    </div>
+    <div class="stat-card" style="border-color:rgba(74,122,62,0.4)">
+      <div class="stat-val">${ocupacion}%</div>
+      <div class="stat-lbl">Ocupación lote</div>
+    </div>
+    <!-- Construido -->
+    <div class="stat-card">
+      <div class="stat-val">${areaConstr.toFixed(0)}</div>
+      <div class="stat-lbl">m² construidos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--muted)">${areaLibre}</div>
+      <div class="stat-lbl">m² jardín / libre</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">${alcobas} / ${banos}</div>
+      <div class="stat-lbl">Alcobas / Baños</div>
+    </div>`;
 
   const cats = {};
   rooms.forEach(r => { if(!cats[r.cat]) cats[r.cat]=[]; cats[r.cat].push(r); });
@@ -1216,9 +1249,9 @@ function addNote(){
   if(!inp.value.trim()) return;
   const cat = currentNoteCat === 'Todas' ? 'General' : currentNoteCat;
   notes.unshift({id:Date.now(), text:inp.value.trim(), cat, ts:'Ahora'});
-  inp.value = ''; renderNotes();
+  inp.value = ''; renderNotes(); saveState();
 }
-function deleteNote(id){ notes = notes.filter(n => n.id !== id); renderNotes(); }
+function deleteNote(id){ notes = notes.filter(n => n.id !== id); renderNotes(); saveState(); }
 function renderNotes(){
   const list = document.getElementById('notesList');
   const filtered = currentNoteCat === 'Todas' ? notes : notes.filter(n => n.cat === currentNoteCat);
@@ -1256,12 +1289,42 @@ function toggleCheck(id, el){
   const done = Object.values(checked).filter(Boolean).length;
   document.getElementById('progressFill').style.width = `${(done/total*100).toFixed(0)}%`;
   document.getElementById('checkProgress').textContent = `${done} de ${total} completados`;
+  saveState();
 }
 
 function toast(msg){
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════════════
+// PERSISTENCIA — localStorage
+// ═══════════════════════════════════════════════
+const SAVE_KEY = 'opcion9_v2';
+
+function saveState(){
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ rooms, notes, checked, nextId }));
+  } catch(e){ console.warn('No se pudo guardar', e); }
+}
+
+function loadState(){
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    if(d.rooms  && Array.isArray(d.rooms))  rooms   = d.rooms;
+    if(d.notes  && Array.isArray(d.notes))  notes   = d.notes;
+    if(d.checked && typeof d.checked === 'object') checked = d.checked;
+    if(d.nextId && d.nextId > nextId)       nextId  = d.nextId;
+  } catch(e){ console.warn('No se pudo cargar estado guardado', e); }
+}
+
+function resetState(){
+  if(!confirm('¿Reiniciar todo el plano al estado original? Los cambios no guardados en otro lugar se perderán.')) return;
+  localStorage.removeItem(SAVE_KEY);
+  location.reload();
 }
 
 // ═══════════ 3D VIEW ═══════════
@@ -2617,8 +2680,8 @@ function onSVGDrag(e){
 }
 
 function endSVGDrag(){
-  if(dragHandle){ view3dDirty = true; dragHandle = null; draw(); setTimeout(() => { didDrag = false; }, 60); return; }
-  if(moveRoom)  { view3dDirty = true; moveRoom   = null; draw(); setTimeout(() => { didDrag = false; }, 60); }
+  if(dragHandle){ view3dDirty = true; dragHandle = null; draw(); saveState(); setTimeout(() => { didDrag = false; }, 60); return; }
+  if(moveRoom)  { view3dDirty = true; moveRoom   = null; draw(); saveState(); setTimeout(() => { didDrag = false; }, 60); }
 }
 
 // Listeners SVG (persisten entre redraws)
@@ -2713,6 +2776,64 @@ function drawGroupHighlights(){
     sh.style.pointerEvents = 'none';
     svg.appendChild(sh);
   });
+}
+
+// ═══════════════════════════════════════════════
+// COTAS DEL LOTE COMPLETO
+// ═══════════════════════════════════════════════
+
+function drawLoteCotas(fs){
+  const lc  = '#4A7A3E';
+  const lw  = 0.9;
+  const off = Math.max(12, fs * 1.8);
+  const tick = 5;
+  const fsBig = Math.max(8, Math.min(12, fs * 1.4));
+
+  // ── Frente: 32 m (cota horizontal inferior) ──
+  const by = SY(FILAS) + off;
+  addL(SX(0),    SY(FILAS)+2, SX(0),    by + tick, lc, lw);
+  addL(SX(COLS), SY(FILAS)+2, SX(COLS), by + tick, lc, lw);
+  addL(SX(0), by, SX(COLS), by, lc, lw * 1.2);
+  addL(SX(0),    by - tick, SX(0),    by + tick, lc, lw * 2);
+  addL(SX(COLS), by - tick, SX(COLS), by + tick, lc, lw * 2);
+
+  // Etiqueta fondo verde oscuro
+  const bx = SX(COLS/2), bcy = by + off * 0.8;
+  const tbg = ns('rect');
+  tbg.setAttribute('x', bx - fsBig*2.4); tbg.setAttribute('y', bcy - fsBig*0.7);
+  tbg.setAttribute('width', fsBig*4.8); tbg.setAttribute('height', fsBig*1.4);
+  tbg.setAttribute('rx','3'); tbg.setAttribute('fill','#0F2010');
+  tbg.setAttribute('stroke', lc); tbg.setAttribute('stroke-width','0.6');
+  svg.appendChild(tbg);
+  addT(bx, bcy, `FRENTE  32 m`, fsBig, '600', '#7AAF6E');
+
+  // ── Fondo: 34 m (cota vertical derecha) ──
+  const rx = SX(COLS) + off;
+  addL(SX(COLS)+2, SY(0),    rx + tick, SY(0),    lc, lw);
+  addL(SX(COLS)+2, SY(FILAS),rx + tick, SY(FILAS), lc, lw);
+  addL(rx, SY(0), rx, SY(FILAS), lc, lw * 1.2);
+  addL(rx - tick, SY(0),    rx + tick, SY(0),    lc, lw * 2);
+  addL(rx - tick, SY(FILAS), rx + tick, SY(FILAS), lc, lw * 2);
+
+  // Etiqueta rotada
+  const ry = SY(FILAS/2), rcx = rx + off * 0.8;
+  const rtbg = ns('rect');
+  rtbg.setAttribute('x', rcx - fsBig*0.7); rtbg.setAttribute('y', ry - fsBig*2.4);
+  rtbg.setAttribute('width', fsBig*1.4); rtbg.setAttribute('height', fsBig*4.8);
+  rtbg.setAttribute('rx','3'); rtbg.setAttribute('fill','#0F2010');
+  rtbg.setAttribute('stroke', lc); rtbg.setAttribute('stroke-width','0.6');
+  rtbg.setAttribute('transform', `rotate(-90,${rcx},${ry})`);
+  svg.appendChild(rtbg);
+
+  const rt = ns('text');
+  rt.setAttribute('x', rcx); rt.setAttribute('y', ry);
+  rt.setAttribute('font-size', fsBig); rt.setAttribute('font-weight','600');
+  rt.setAttribute('fill','#7AAF6E'); rt.setAttribute('text-anchor','middle');
+  rt.setAttribute('dominant-baseline','central');
+  rt.setAttribute('font-family','DM Sans,sans-serif');
+  rt.setAttribute('transform',`rotate(-90,${rcx},${ry})`);
+  rt.textContent = 'FONDO  34 m';
+  svg.appendChild(rt);
 }
 
 // ═══════════════════════════════════════════════
@@ -2817,6 +2938,7 @@ function drawCompass(){
   });
 })();
 
+loadState();  // restaura plano guardado si existe
 draw();
 document.getElementById('gridBtn').classList.add('active');
 document.getElementById('labelBtn').classList.add('active');
