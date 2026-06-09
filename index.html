@@ -106,6 +106,8 @@ svg{display:block;}
 
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(70px);background:#2C2C28;color:var(--paper);padding:10px 18px;border-radius:20px;font-size:12px;border:1px solid var(--border);opacity:0;transition:all 0.3s;z-index:999;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#saveIndicator{font-size:9px;color:var(--muted);letter-spacing:0.5px;transition:color 0.4s;white-space:nowrap;}
+#saveIndicator.saved{color:var(--accent);}
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px;}
 
@@ -164,6 +166,9 @@ svg{display:block;}
 .seg-total.ok{color:var(--accent);}
 .seg-total.warn{color:#E74C3C;}
 .seg-detail-btn{width:100%;padding:6px 10px;margin-top:8px;background:rgba(201,168,76,0.15);color:var(--gold);border:1px solid rgba(201,168,76,0.3);border-radius:3px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:0.3px;}
+.btn-poly{background:rgba(90,143,192,0.15);color:#5A8FC0;border:1px solid rgba(90,143,192,0.35);}
+.btn-poly:hover{background:rgba(90,143,192,0.28);}
+.poly-hint{font-size:10px;color:var(--muted);line-height:1.5;margin-top:6px;padding:6px 8px;background:var(--card);border-radius:3px;border:1px solid var(--border);}
 </style>
 </head>
 <body>
@@ -176,9 +181,11 @@ svg{display:block;}
     <div class="project-meta">Terreno 32×34 m · 337 m² · 3 Alcobas</div>
   </div>
   <div class="topbar-right">
+    <span id="saveIndicator">● guardado</span>
     <button class="icon-btn" id="groupBtn" onclick="toggleMultiMode()" title="Seleccionar suite (mover varios cuartos juntos)">⊹</button>
     <button class="icon-btn" id="gridBtn" onclick="toggleGrid()" title="Cuadrícula">⊞</button>
     <button class="icon-btn" id="labelBtn" onclick="toggleLabels()" title="Etiquetas">T</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportJSON()" title="Exportar plano como archivo">↓ JSON</button>
     <button class="btn btn-ghost btn-sm" onclick="window.print()">↗ PDF</button>
     <button class="btn btn-accent btn-sm" onclick="addRoom()">+ Espacio</button>
   </div>
@@ -288,6 +295,8 @@ svg{display:block;}
     </div>
     <div class="panel-actions">
       <button class="btn btn-accent" onclick="applyEdit()">✓ Aplicar</button>
+      <button class="btn btn-poly btn-sm" id="polyBtn" onclick="convertToPoly()">⬡ Forma libre</button>
+      <div id="polyHint" class="poly-hint" style="display:none;">Arrastra los vértices (azul) para ajustar la forma. Toca el punto intermedio (gris) para agregar un vértice.</div>
       <div style="display:flex;gap:6px;">
         <button class="btn btn-gold btn-sm" onclick="duplicateRoom()" style="flex:1">⊕ Duplicar</button>
         <button class="btn btn-danger btn-sm" onclick="deleteRoom()" style="flex:1">🗑 Eliminar</button>
@@ -299,7 +308,9 @@ svg{display:block;}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <div class="specs-title" style="margin:0">Especificaciones</div>
       <div style="display:flex;gap:6px;">
-        <button class="btn btn-ghost btn-sm" onclick="window.print()">↗ Exportar</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportJSON()">↓ JSON</button>
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer;" title="Importar plano desde archivo JSON">↑ Import<input type="file" accept=".json" style="display:none" onchange="importJSON(event)"></label>
+        <button class="btn btn-ghost btn-sm" onclick="window.print()">↗ PDF</button>
         <button class="btn btn-sm" style="background:rgba(192,57,43,0.12);color:#E74C3C;border:1px solid rgba(192,57,43,0.25);" onclick="resetState()">↺ Reiniciar</button>
       </div>
     </div>
@@ -454,6 +465,7 @@ function SY(f){ return 22 + f*U; }
 function SW(c1,c2){ return (c2-c1)*U; }
 function SH(f1,f2){ return (f2-f1)*U; }
 function area(r){
+  if(r.poly) return polyArea(r.poly).toFixed(1);
   if(r.lshape){
     const full = (r.c2-r.c1)*(r.f2-r.f1);
     const notch = (r.notchC2-r.notchC1)*(r.notchF2-r.notchF1);
@@ -479,7 +491,7 @@ function draw(){
   addR(SX(0), SY(0), COLS*U, FILAS*U, '#E8F0DE', '#4A7A3E', 1.8);
   addT(SX(COLS)-4, SY(0)+8, 'TERRENO 32×34 m', Math.max(6, U*0.4), '600', '#3A6035', 'end');
 
-  rooms.forEach(r => { if(r.lshape) drawLShape(r); else drawRoom(r); });
+  rooms.forEach(r => { if(r.lshape) drawLShape(r); else if(r.poly) drawPolyRoom(r); else drawRoom(r); });
 
   addR(SX(mirador.c1)+1, SY(mirador.f1)+1, SW(mirador.c1,mirador.c2)-2, SH(mirador.f1,mirador.f2)-2, 'none', '#3D5A38', 0.7, '3,2');
   const mfs = Math.max(U*0.25, U*0.32);
@@ -519,10 +531,13 @@ function draw(){
   // Cotas del lote completo
   drawLoteCotas(fs);
 
-  // Cotas + resize handles en cuarto seleccionado
+  // Cotas + resize/poly handles en cuarto seleccionado
   if(selectedId){
     const sr = rooms.find(x => x.id === selectedId);
-    if(sr && !sr.lshape){ drawCotas(sr); drawHandles(sr); }
+    if(sr && !sr.lshape){
+      if(sr.poly){ drawPolyHandles(sr); }
+      else { drawCotas(sr); drawHandles(sr); }
+    }
   }
   // Highlights + move handles del grupo
   if(groupIds.size > 0) drawGroupHighlights();
@@ -744,11 +759,29 @@ function selectRoom(id){
   } else {
     lf.style.display = 'none';
   }
+  // Actualizar estado del botón de forma libre
+  const pb = document.getElementById('polyBtn');
+  const ph = document.getElementById('polyHint');
+  if(r.lshape){
+    pb.style.display = 'none';
+    if(ph) ph.style.display = 'none';
+  } else {
+    pb.style.display = '';
+    pb.textContent = r.poly ? '☐ Revertir a rect.' : '⬡ Forma libre';
+    if(ph) ph.style.display = r.poly ? 'block' : 'none';
+  }
   document.getElementById('rightPanel').classList.add('open');
   draw();
 }
 
 function updateAreaDisplay(){
+  if(selectedId){
+    const r = rooms.find(x => x.id === selectedId);
+    if(r && r.poly){
+      document.getElementById('areaDisplay').textContent = `${polyArea(r.poly).toFixed(2)} m²`;
+      return;
+    }
+  }
   const c1 = +document.getElementById('fC1').value;
   const c2 = +document.getElementById('fC2').value;
   const f1 = +document.getElementById('fF1').value;
@@ -800,7 +833,7 @@ function buildWallEditor(r){
     }
     buildWallEditor(r);
     view3dDirty = true;
-    draw();
+    draw(); saveState();
   }
 
   const colors = {
@@ -1037,7 +1070,7 @@ function updateSegment(edge, idx, field, value){
   r.segments[edge][idx][field] = value;
   renderSegmentEditor(r);
   view3dDirty = true;
-  draw(); // refresh main plan to reflect changes
+  draw(); saveState();
 }
 
 function addSegment(edge){
@@ -1051,7 +1084,7 @@ function addSegment(edge){
   r.segments[edge].push({type: 'wall', length: Math.min(1, remaining)});
   renderSegmentEditor(r);
   view3dDirty = true;
-  draw();
+  draw(); saveState();
 }
 
 function deleteSegment(edge, idx){
@@ -1062,7 +1095,7 @@ function deleteSegment(edge, idx){
   r.segments[edge].splice(idx, 1);
   renderSegmentEditor(r);
   view3dDirty = true;
-  draw();
+  draw(); saveState();
 }
 
 function buildSwatches(sel){
@@ -1303,9 +1336,17 @@ function toast(msg){
 // ═══════════════════════════════════════════════
 const SAVE_KEY = 'opcion9_v2';
 
+let _saveTimer = null;
 function saveState(){
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({ rooms, notes, checked, nextId }));
+    const ind = document.getElementById('saveIndicator');
+    if(ind){
+      ind.textContent = '● guardado';
+      ind.classList.add('saved');
+      clearTimeout(_saveTimer);
+      _saveTimer = setTimeout(() => { ind.classList.remove('saved'); }, 1800);
+    }
   } catch(e){ console.warn('No se pudo guardar', e); }
 }
 
@@ -1325,6 +1366,37 @@ function resetState(){
   if(!confirm('¿Reiniciar todo el plano al estado original? Los cambios no guardados en otro lugar se perderán.')) return;
   localStorage.removeItem(SAVE_KEY);
   location.reload();
+}
+
+function exportJSON(){
+  const data = JSON.stringify({ rooms, notes, checked, nextId }, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'opcion9_plano.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importJSON(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const d = JSON.parse(e.target.result);
+      if(!d.rooms || !Array.isArray(d.rooms)) throw new Error('Formato inválido');
+      if(!confirm('¿Reemplazar el plano actual con el archivo importado?')) return;
+      rooms   = d.rooms;
+      notes   = d.notes  || [];
+      checked = d.checked|| {};
+      nextId  = d.nextId || (rooms.length + 1);
+      saveState(); draw();
+      showToast('Plano importado correctamente');
+    } catch(er){ alert('No se pudo importar: ' + er.message); }
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
 }
 
 // ═══════════ 3D VIEW ═══════════
@@ -2635,6 +2707,21 @@ function drawHandles(r){
 }
 
 function onSVGDrag(e){
+  // ── POLY vertex drag ──
+  if(dragHandle && dragHandle.type === 'POLY'){
+    didDrag = true;
+    const pt = e.touches ? getSVGCoords(e.touches[0]) : getSVGCoords(e);
+    const dc = (pt.x - dragHandle.startX) / U;
+    const df = (pt.y - dragHandle.startY) / U;
+    const origV = dragHandle.origVerts[dragHandle.idx];
+    dragHandle.room.poly[dragHandle.idx] = [
+      Math.max(0, Math.min(COLS,  snapHalf(origV[0] + dc))),
+      Math.max(0, Math.min(FILAS, snapHalf(origV[1] + df)))
+    ];
+    const aVal = polyArea(dragHandle.room.poly).toFixed(2);
+    document.getElementById('areaDisplay').textContent = `${aVal} m²`;
+    draw(); return;
+  }
   // ── Resize handle ──
   if(dragHandle){
     didDrag = true;
@@ -2665,13 +2752,20 @@ function onSVGDrag(e){
     const pt  = e.touches ? getSVGCoords(e.touches[0]) : getSVGCoords(e);
     const sdc = snapHalf((pt.x - moveRoom.startX) / U);
     const sdf = snapHalf((pt.y - moveRoom.startY) / U);
-    moveRoom.rooms.forEach(({room:r, origC1, origC2, origF1, origF2}) => {
-      const w = origC2 - origC1, h = origF2 - origF1;
-      r.c1 = Math.max(0, Math.min(origC1 + sdc, COLS - w)); r.c2 = r.c1 + w;
-      r.f1 = Math.max(0, Math.min(origF1 + sdf, FILAS - h)); r.f2 = r.f1 + h;
+    moveRoom.rooms.forEach(({room:r, origC1, origC2, origF1, origF2, origPoly}) => {
+      if(origPoly){
+        r.poly = origPoly.map(v => [
+          Math.max(0, Math.min(COLS,  snapHalf(v[0] + sdc))),
+          Math.max(0, Math.min(FILAS, snapHalf(v[1] + sdf)))
+        ]);
+      } else {
+        const w = origC2 - origC1, h = origF2 - origF1;
+        r.c1 = Math.max(0, Math.min(origC1 + sdc, COLS - w)); r.c2 = r.c1 + w;
+        r.f1 = Math.max(0, Math.min(origF1 + sdf, FILAS - h)); r.f2 = r.f1 + h;
+      }
     });
     const pr = moveRoom.rooms[0]?.room;
-    if(pr){
+    if(pr && !pr.poly){
       document.getElementById('fC1').value = pr.c1; document.getElementById('fC2').value = pr.c2;
       document.getElementById('fF1').value = pr.f1; document.getElementById('fF2').value = pr.f2;
     }
@@ -2697,8 +2791,14 @@ svg.addEventListener('touchend',  e => { if(dragHandle||moveRoom){ e.preventDefa
 
 function drawMoveHandle(r, isGroup){
   if(!r) return;
-  const cx = (SX(r.c1) + SX(r.c2)) / 2;
-  const cy = (SY(r.f1) + SY(r.f2)) / 2;
+  let cx, cy;
+  if(r.poly){
+    const cen = polyCentroid(r.poly);
+    cx = SX(cen[0]); cy = SY(cen[1]);
+  } else {
+    cx = (SX(r.c1) + SX(r.c2)) / 2;
+    cy = (SY(r.f1) + SY(r.f2)) / 2;
+  }
   const hs = Math.max(9, Math.min(15, U * 0.5));
 
   const bg = ns('circle');
@@ -2725,10 +2825,12 @@ function drawMoveHandle(r, isGroup){
     const toMove = [];
     const addR = id => {
       const rm = rooms.find(x => x.id === id);
-      if(rm) toMove.push({room:rm, origC1:rm.c1, origC2:rm.c2, origF1:rm.f1, origF2:rm.f2});
+      if(!rm) return;
+      const entry = {room:rm, origC1:rm.c1, origC2:rm.c2, origF1:rm.f1, origF2:rm.f2};
+      if(rm.poly) entry.origPoly = rm.poly.map(v => [...v]);
+      toMove.push(entry);
     };
     addR(r.id);
-    // Si es parte del grupo, mover todo el grupo
     if(groupIds.has(r.id)) groupIds.forEach(id => { if(id !== r.id) addR(id); });
     moveRoom = { startX:coords.x, startY:coords.y, rooms:toMove };
   }
@@ -2765,16 +2867,28 @@ function drawGroupHighlights(){
   groupIds.forEach(id => {
     const r = rooms.find(x => x.id === id);
     if(!r || r.lshape) return;
-    const sh = ns('rect');
-    sh.setAttribute('x', SX(r.c1)-3); sh.setAttribute('y', SY(r.f1)-3);
-    sh.setAttribute('width', SW(r.c1,r.c2)+6); sh.setAttribute('height', SH(r.f1,r.f2)+6);
-    sh.setAttribute('fill', 'none');
-    sh.setAttribute('stroke', '#C9A84C');
-    sh.setAttribute('stroke-width', '2');
-    sh.setAttribute('stroke-dasharray', '5,2');
-    sh.setAttribute('rx', '2');
-    sh.style.pointerEvents = 'none';
-    svg.appendChild(sh);
+    if(r.poly){
+      const ptsStr = r.poly.map(p => `${SX(p[0])},${SY(p[1])}`).join(' ');
+      const sh = ns('polygon');
+      sh.setAttribute('points', ptsStr);
+      sh.setAttribute('fill', 'none');
+      sh.setAttribute('stroke', '#C9A84C');
+      sh.setAttribute('stroke-width', '2');
+      sh.setAttribute('stroke-dasharray', '5,2');
+      sh.style.pointerEvents = 'none';
+      svg.appendChild(sh);
+    } else {
+      const sh = ns('rect');
+      sh.setAttribute('x', SX(r.c1)-3); sh.setAttribute('y', SY(r.f1)-3);
+      sh.setAttribute('width', SW(r.c1,r.c2)+6); sh.setAttribute('height', SH(r.f1,r.f2)+6);
+      sh.setAttribute('fill', 'none');
+      sh.setAttribute('stroke', '#C9A84C');
+      sh.setAttribute('stroke-width', '2');
+      sh.setAttribute('stroke-dasharray', '5,2');
+      sh.setAttribute('rx', '2');
+      sh.style.pointerEvents = 'none';
+      svg.appendChild(sh);
+    }
   });
 }
 
@@ -2882,6 +2996,165 @@ function drawCompass(){
   addL(bx, by - 3, bx, by + 3, '#9A9890', 1);
   addL(bx + barLen, by - 3, bx + barLen, by + 3, '#9A9890', 1);
   addT(bx + barLen/2, by - 5, '5 m', Math.max(5.5, fs * 0.9), '400', '#9A9890');
+}
+
+// ═══════════════════════════════════════════════
+// FORMAS LIBRES — Polígono editable
+// ═══════════════════════════════════════════════
+
+function polyArea(pts){
+  let a = 0;
+  for(let i = 0; i < pts.length; i++){
+    const j = (i + 1) % pts.length;
+    a += pts[i][0] * pts[j][1];
+    a -= pts[j][0] * pts[i][1];
+  }
+  return Math.abs(a / 2);
+}
+
+function polyCentroid(pts){
+  let cx = 0, cy = 0;
+  pts.forEach(p => { cx += p[0]; cy += p[1]; });
+  return [cx / pts.length, cy / pts.length];
+}
+
+function drawPolyRoom(r){
+  const sel = selectedId === r.id;
+  const ptsStr = r.poly.map(p => `${SX(p[0])},${SY(p[1])}`).join(' ');
+  const poly = ns('polygon');
+  poly.setAttribute('points', ptsStr);
+  poly.setAttribute('fill', r.fill);
+  poly.setAttribute('stroke', sel ? '#3D5A38' : '#1C1C1A');
+  poly.setAttribute('stroke-width', sel ? 2 : 0.9);
+  poly.setAttribute('cursor', 'pointer');
+  poly.addEventListener('click', () => { if(!didDrag) selectRoom(r.id); });
+  svg.appendChild(poly);
+
+  if(showLabels){
+    const cen = polyCentroid(r.poly);
+    const cx = SX(cen[0]), cy = SY(cen[1]);
+    const a = polyArea(r.poly);
+    const minDim = Math.sqrt(a) * U;
+    const fs0 = Math.max(U * 0.18, Math.min(U * 0.42, minDim * 0.13));
+    addT(cx, cy - fs0 * 0.5, r.name, fs0, '600', '#1C1C1A');
+    addT(cx, cy + fs0 * 0.6, `${a.toFixed(1)} m²`, fs0 * 0.72, '300', '#666');
+  }
+}
+
+function drawPolyHandles(r){
+  if(!r || !r.poly) return;
+  const pts = r.poly;
+  const hs  = Math.max(5, U * 0.32);
+
+  pts.forEach((p, i) => {
+    const px = SX(p[0]), py = SY(p[1]);
+    const j  = (i + 1) % pts.length;
+    const mpx = SX((pts[i][0] + pts[j][0]) / 2);
+    const mpy = SY((pts[i][1] + pts[j][1]) / 2);
+
+    // — Punto intermedio: click añade vértice
+    const mhit = ns('circle');
+    mhit.setAttribute('cx', mpx); mhit.setAttribute('cy', mpy);
+    mhit.setAttribute('r', Math.max(10, hs * 1.4));
+    mhit.setAttribute('fill', 'transparent'); mhit.style.cursor = 'copy';
+    mhit.addEventListener('click', e => { e.stopPropagation(); addPolyVertex(r, i); });
+    mhit.addEventListener('touchend', e => { e.stopPropagation(); e.preventDefault(); addPolyVertex(r, i); });
+    svg.appendChild(mhit);
+
+    const mvis = ns('circle');
+    mvis.setAttribute('cx', mpx); mvis.setAttribute('cy', mpy);
+    mvis.setAttribute('r', Math.max(3, hs * 0.45));
+    mvis.setAttribute('fill', 'rgba(200,200,200,0.65)');
+    mvis.setAttribute('stroke', '#aaa'); mvis.setAttribute('stroke-width', '0.8');
+    mvis.style.pointerEvents = 'none';
+    svg.appendChild(mvis);
+
+    // — Vértice: drag mueve
+    const vhit = ns('circle');
+    vhit.setAttribute('cx', px); vhit.setAttribute('cy', py);
+    vhit.setAttribute('r', Math.max(12, hs * 1.6));
+    vhit.setAttribute('fill', 'transparent'); vhit.style.cursor = 'move';
+
+    function startPolyDrag(e){
+      e.stopPropagation();
+      const coords = e.touches ? getSVGCoords(e.touches[0]) : getSVGCoords(e);
+      dragHandle = { type:'POLY', room:r, idx:i,
+        startX:coords.x, startY:coords.y,
+        origVerts: pts.map(v => [...v]) };
+    }
+    vhit.addEventListener('mousedown', startPolyDrag);
+    vhit.addEventListener('touchstart', e => { e.preventDefault(); startPolyDrag(e); }, {passive:false});
+    svg.appendChild(vhit);
+
+    const vvis = ns('circle');
+    vvis.setAttribute('cx', px); vvis.setAttribute('cy', py);
+    vvis.setAttribute('r', Math.max(3.5, hs * 0.6));
+    vvis.setAttribute('fill', '#5A8FC0');
+    vvis.setAttribute('stroke', '#fff'); vvis.setAttribute('stroke-width', '1.5');
+    vvis.style.pointerEvents = 'none';
+    svg.appendChild(vvis);
+
+    // — × para eliminar vértice (solo si hay > 3)
+    if(pts.length > 3){
+      const dBtn = ns('text');
+      const dx = px + hs * 0.9, dy = py - hs * 0.9;
+      dBtn.setAttribute('x', dx); dBtn.setAttribute('y', dy);
+      dBtn.setAttribute('font-size', Math.max(6, hs * 0.85));
+      dBtn.setAttribute('fill', '#E74C3C'); dBtn.setAttribute('text-anchor', 'middle');
+      dBtn.setAttribute('dominant-baseline', 'central');
+      dBtn.setAttribute('font-family', 'DM Sans,sans-serif'); dBtn.setAttribute('font-weight', '700');
+      dBtn.style.cursor = 'pointer';
+      dBtn.textContent = '×';
+      dBtn.addEventListener('click', e => { e.stopPropagation(); deletePolyVertex(r, i); });
+      dBtn.addEventListener('touchend', e => { e.stopPropagation(); e.preventDefault(); deletePolyVertex(r, i); });
+      svg.appendChild(dBtn);
+    }
+  });
+}
+
+function addPolyVertex(r, afterIdx){
+  const pts = r.poly;
+  const j   = (afterIdx + 1) % pts.length;
+  const mp  = [
+    snapHalf((pts[afterIdx][0] + pts[j][0]) / 2),
+    snapHalf((pts[afterIdx][1] + pts[j][1]) / 2)
+  ];
+  pts.splice(afterIdx + 1, 0, mp);
+  view3dDirty = true; draw(); saveState();
+}
+
+function deletePolyVertex(r, idx){
+  if(r.poly.length <= 3) return;
+  r.poly.splice(idx, 1);
+  view3dDirty = true; draw(); saveState();
+}
+
+function convertToPoly(){
+  if(!selectedId) return;
+  const r = rooms.find(x => x.id === selectedId);
+  if(!r) return;
+  if(r.poly){
+    // Revertir: calcular bounding box del polígono
+    const xs = r.poly.map(p => p[0]);
+    const ys = r.poly.map(p => p[1]);
+    r.c1 = snapHalf(Math.min(...xs)); r.c2 = snapHalf(Math.max(...xs));
+    r.f1 = snapHalf(Math.min(...ys)); r.f2 = snapHalf(Math.max(...ys));
+    delete r.poly;
+    const pb = document.getElementById('polyBtn');
+    if(pb){ pb.textContent = '⬡ Forma libre'; }
+    const ph = document.getElementById('polyHint');
+    if(ph){ ph.style.display = 'none'; }
+  } else {
+    r.poly = [
+      [r.c1, r.f1], [r.c2, r.f1],
+      [r.c2, r.f2], [r.c1, r.f2]
+    ];
+    const pb = document.getElementById('polyBtn');
+    if(pb){ pb.textContent = '☐ Revertir a rect.'; }
+    const ph = document.getElementById('polyHint');
+    if(ph){ ph.style.display = 'block'; }
+  }
+  view3dDirty = true; draw(); saveState();
 }
 
 // ═══════════════════════════════════════════════
